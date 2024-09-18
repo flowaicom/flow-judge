@@ -1,0 +1,41 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Local configuration
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# ruff cache
+.ruff_cache/
+
+# mypy cache
+.mypy_cache/
+
+# pytype cache
+.pytype/
+
+# pyc
+*.pyc
+
+# output
+output/

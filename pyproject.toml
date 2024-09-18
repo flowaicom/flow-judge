@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flow-judge"
+version = "0.1.0"
+description = "A small yet powerful LM Judge"
+readme = "README.md"
+authors = [
+    {name = "Bernardo Garcia", email = "bernardo@flow-ai.com"},
+    {name = "Karolus Sariola", email = "karolus@flow-ai.com"},
+    {name = "Minaam Shahid", email = "minaam@flow-ai.com"},
+    {name = "Tiina Vaahtio", email = "tiina@flow-ai.com"}
+]
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache 2.0 License",
+    "Operating System :: OS Independent",
+]
+keywords = ["LM-judge", "evaluation", "LLMs", "AI", "benchmarking"]
+dependencies = [
+    "pydantic>=2.9.1",
+    "transformers>=4.44.2",
+    "torch>=2.3.0",
+    "requests>=2.32.3",
+    "bitsandbytes>=0.41.0,<=0.42.0",
+    "accelerate>=0.34.2",
+    "flash-attn>=2.6.3",
+    "fsspec>=2024.6.1",
+    "pyarrow<15.0.0,>=14.0.1"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+    "ruff",
+    "black",
+    "isort",
+]
+vllm = ["vllm>=0.6.0"]
+
+[project.urls]
+Homepage = "https://github.com/flowaicom/flow-judge"
+
+[tool.setuptools]
+packages = ["flow_judge"]
+
+[tool.setuptools_scm]
+version_scheme = "python-simplified-semver"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "C", "D"]
+ignore = ["D100", "D104"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 100

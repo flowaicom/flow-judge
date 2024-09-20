@@ -1,43 +1,29 @@
-import json
-import os
-import tempfile
+import shutil
+from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
 
-from flow_judge import EvalInput, FlowJudge
-from flow_judge.formatting import (
-    USER_PROMPT_NO_INPUTS_TEMPLATE,
-    USER_PROMPT_TEMPLATE,
-    format_rubric,
-    format_user_prompt,
-    format_vars,
-)
+from flow_judge.eval_data_types import EvalInput, EvalOutput
+from flow_judge.flow_judge import FlowJudge
 from flow_judge.metrics import RESPONSE_CORRECTNESS_BINARY, CustomMetric, RubricItem
-from flow_judge.models.models import BaseFlowJudgeModel
-from flow_judge.parsing import EvalOutput
+from flow_judge.models.base import BaseFlowJudgeModel
+from flow_judge.utils.prompt_formatter import format_rubric, format_vars
 
 
 class MockFlowJudgeModel(BaseFlowJudgeModel):
     """Mock model for testing."""
 
-    def __init__(self, model_id: str, model_type: str, generation_params: dict):
+    def __init__(self, model_id, model_type, generation_params):
         """Initialize the mock model."""
         super().__init__(model_id, model_type, generation_params)
-        self.generate_return_value = (
-            "<feedback>This is a test feedback.</feedback>\n<score>2</score>"
-        )
-        self.batch_generate_return_value = [
-            "<feedback>This is a test feedback.</feedback>\n<score>2</score>"
-        ] * 2
 
-    def generate(self, prompt: str) -> str:
-        """Generate a response based on the given prompt."""
-        return self.generate_return_value
+    def generate(self, prompt):
+        """Generate a mock response."""
+        return "<feedback>Test feedback</feedback>\n<score>1</score>"
 
-    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs) -> list[str]:
-        """Generate responses for multiple prompts."""
-        return self.batch_generate_return_value
+    def batch_generate(self, prompts, use_tqdm=True):
+        """Generate mock responses for a list of prompts."""
+        return ["<feedback>Test feedback</feedback>\n<score>1</score>" for _ in prompts]
 
 
 @pytest.fixture
@@ -46,65 +32,113 @@ def mock_model():
     return MockFlowJudgeModel("test-model", "mock", {"temperature": 0.7})
 
 
+def test_flow_judge_initialization(mock_model):
+    """Test the initialization of FlowJudge."""
+    judge = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
+    assert isinstance(judge, FlowJudge)
+    assert judge.metric == RESPONSE_CORRECTNESS_BINARY
+    assert judge.model == mock_model
+
+
+def test_flow_judge_initialization_invalid_metric():
+    """Test FlowJudge initialization with invalid metric."""
+    with pytest.raises(ValueError):
+        FlowJudge(metric="invalid_metric", model=mock_model)
+
+
 def test_flow_judge_evaluate(mock_model):
     """Test the evaluate method of FlowJudge."""
     judge = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
-
     eval_input = EvalInput(
-        inputs=[{"question": "What is the capital of France?"}],
-        output="The capital of France is Paris.",
+        inputs=[{"query": "Test query"}, {"reference_answer": "Test reference"}],
+        output={"response": "Test response"},
     )
-
     result = judge.evaluate(eval_input)
-
-    assert result.feedback == "This is a test feedback."
-    assert result.score == 2
+    assert isinstance(result, EvalOutput)
+    assert result.feedback == "Test feedback"
+    assert result.score == 1
 
 
 def test_flow_judge_batch_evaluate(mock_model):
     """Test the batch_evaluate method of FlowJudge."""
     judge = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
-
     eval_inputs = [
         EvalInput(
-            inputs=[{"question": "What is the capital of France?"}],
-            output="The capital of France is Paris.",
+            inputs=[{"query": "Test query 1"}, {"reference_answer": "Test reference 1"}],
+            output={"response": "Test response 1"},
         ),
-        EvalInput(inputs=[{"question": "What is 2+2?"}], output="2+2 equals 4."),
+        EvalInput(
+            inputs=[{"query": "Test query 2"}, {"reference_answer": "Test reference 2"}],
+            output={"response": "Test response 2"},
+        ),
     ]
-
-    results = judge.batch_evaluate(eval_inputs)
-
+    results = judge.batch_evaluate(eval_inputs, save_results=False)
     assert len(results) == 2
     for result in results:
-        assert result.feedback == "This is a test feedback."
-        assert result.score == 2
+        assert isinstance(result, EvalOutput)
+        assert result.feedback == "Test feedback"
+        assert result.score == 1
+
+
+@pytest.mark.parametrize("save_results", [True, False])
+def test_flow_judge_evaluate_save_results(mock_model, tmp_path, save_results):
+    """Test saving results in the evaluate method."""
+    judge = FlowJudge(
+        metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model, output_dir=str(tmp_path)
+    )
+    eval_input = EvalInput(
+        inputs=[{"query": "Test query"}, {"reference_answer": "Test reference"}],
+        output={"response": "Test response"},
+    )
+    with patch("flow_judge.flow_judge.write_results_to_disk") as mock_write:
+        judge.evaluate(eval_input, save_results=save_results)
+        if save_results:
+            mock_write.assert_called_once()
+        else:
+            mock_write.assert_not_called()
 
 
 def test_custom_metric():
     """Test creating and using a custom metric."""
     custom_metric = CustomMetric(
-        name="Test Metric",
-        criteria="Test criteria",
-        rubric=[
-            RubricItem(score=0, description="Bad"),
-            RubricItem(score=1, description="Good"),
-        ],
+        name="custom_metric",
+        criteria="Custom criteria",
+        rubric=[RubricItem(score=0, description="Bad"), RubricItem(score=1, description="Good")],
+        required_inputs=["custom_input"],
+        required_output="custom_output",
     )
-
-    assert custom_metric.name == "Test Metric"
-    assert custom_metric.criteria == "Test criteria"
+    assert custom_metric.name == "custom_metric"
+    assert custom_metric.criteria == "Custom criteria"
     assert len(custom_metric.rubric) == 2
+    assert custom_metric.required_inputs == ["custom_input"]
+    assert custom_metric.required_output == "custom_output"
 
 
-def test_eval_input_validation():
+def test_eval_input_validation(mock_model):
     """Test EvalInput validation."""
-    valid_input = EvalInput(inputs=[{"question": "Test?"}], output="Test output")
-    assert valid_input.inputs[0]["question"] == "Test?"
-    assert valid_input.output == "Test output"
+    judge = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
 
-    with pytest.raises(ValidationError):
-        EvalInput(inputs="invalid", output="Test output")
+    # Valid input
+    valid_input = EvalInput(
+        inputs=[{"query": "Test query"}, {"reference_answer": "Test reference"}],
+        output={"response": "Test response"},
+    )
+    assert judge.evaluate(valid_input)
+
+    # Invalid input - missing required input
+    invalid_input = EvalInput(
+        inputs=[{"query": "Test query"}], output={"response": "Test response"}
+    )
+    with pytest.raises(ValueError):
+        judge.evaluate(invalid_input)
+
+    # Invalid input - wrong output key
+    invalid_output = EvalInput(
+        inputs=[{"query": "Test query"}, {"reference_answer": "Test reference"}],
+        output={"wrong_key": "Test response"},
+    )
+    with pytest.raises(ValueError):
+        judge.evaluate(invalid_output)
 
 
 def test_eval_output_parsing():
@@ -140,196 +174,8 @@ def test_format_rubric():
     assert expected == formatted
 
 
-def test_format_user_prompt():
-    """Test format_user_prompt function."""
-    variables = {
-        "INPUTS": "Test input",
-        "OUTPUT": "Test output",
-        "EVALUATION_CRITERIA": "Test criteria",
-        "RUBRIC": "Test rubric",
-    }
-
-    # Test with inputs
-    expected_with_inputs = USER_PROMPT_TEMPLATE.format(**variables)
-    formatted_with_inputs = format_user_prompt(variables)
-    assert formatted_with_inputs == expected_with_inputs
-
-    # Test without inputs
-    variables["INPUTS"] = ""
-    expected_without_inputs = USER_PROMPT_NO_INPUTS_TEMPLATE.format(**variables)
-    formatted_without_inputs = format_user_prompt(variables)
-    assert formatted_without_inputs == expected_without_inputs
-
-
-@pytest.fixture
-def flow_judge_instance(mock_model):
-    """Fixture to create a FlowJudge instance for testing."""
-    instance = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
-    yield instance
-    # Add any additional cleanup for FlowJudge if necessary
-    del instance
-
-
-def test_write_results_to_jsonl_single(flow_judge_instance):
-    """Test write_results_to_jsonl with a single EvalInput and EvalOutput."""
-    eval_input = EvalInput(
-        inputs=[{"question": "What is the capital of France?"}],
-        output="The capital of France is Paris.",
-    )
-    eval_output = EvalOutput(feedback="Good answer.", score=1)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        flow_judge_instance.write_results_to_jsonl([eval_input], [eval_output], tmpdir)
-
-        # Construct expected metric folder name
-        metric_name = "response_correctness_binary"
-        metric_folder = os.path.join(tmpdir, metric_name)
-        assert os.path.isdir(metric_folder), "Metric folder was not created."
-
-        # List files in metric folder
-        files = os.listdir(metric_folder)
-        assert len(files) == 2, "Metadata and results files were not created."
-
-        # Identify metadata and results files
-        metadata_files = [f for f in files if f.startswith("metadata_")]
-        results_files = [f for f in files if f.startswith("results_")]
-        assert len(metadata_files) == 1, "Metadata file not found."
-        assert len(results_files) == 1, "Results file not found."
-
-        metadata_path = os.path.join(metric_folder, metadata_files[0])
-        results_path = os.path.join(metric_folder, results_files[0])
-
-        # Verify metadata content
-        with open(metadata_path, encoding="utf-8") as f:
-            metadata = json.loads(f.readline())
-            assert metadata["model_id"] == "test-model", "Model ID mismatch in metadata."
-            assert metadata["model_type"] == "mock", "Model type mismatch in metadata."
-            assert "timestamp" in metadata, "Timestamp missing in metadata."
-            assert "generation_params" in metadata, "Generation parameters missing in metadata."
-
-        # Verify results content
-        with open(results_path, encoding="utf-8") as f:
-            result = json.loads(f.readline())
-            assert result["sample"]["inputs"] == eval_input.inputs, "Inputs mismatch in results."
-            assert result["sample"]["output"] == eval_input.output, "Output mismatch in results."
-            assert result["feedback"] == eval_output.feedback, "Feedback mismatch in results."
-            assert result["score"] == eval_output.score, "Score mismatch in results."
-
-    # Ensure that the temporary directory and its contents are deleted
-    assert not os.path.exists(tmpdir), "Temporary directory was not deleted."
-
-
-def test_write_results_to_jsonl_batch(flow_judge_instance):
-    """Test write_results_to_jsonl with multiple EvalInputs and EvalOutputs."""
-    eval_inputs = [
-        EvalInput(
-            inputs=[{"question": "What is the capital of France?"}],
-            output="The capital of France is Paris.",
-        ),
-        EvalInput(inputs=[{"question": "What is 2+2?"}], output="2+2 equals 4."),
-    ]
-    eval_outputs = [
-        EvalOutput(feedback="Good answer.", score=1),
-        EvalOutput(feedback="Correct.", score=1),
-    ]
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        flow_judge_instance.write_results_to_jsonl(eval_inputs, eval_outputs, tmpdir)
-
-        # Construct expected metric folder name
-        metric_name = "response_correctness_binary"
-        metric_folder = os.path.join(tmpdir, metric_name)
-        assert os.path.isdir(metric_folder), "Metric folder was not created."
-
-        # List files in metric folder
-        files = os.listdir(metric_folder)
-        assert len(files) == 2, "Metadata and results files were not created."
-
-        # Identify metadata and results files
-        metadata_files = [f for f in files if f.startswith("metadata_")]
-        results_files = [f for f in files if f.startswith("results_")]
-        assert len(metadata_files) == 1, "Metadata file not found."
-        assert len(results_files) == 1, "Results file not found."
-
-        metadata_path = os.path.join(metric_folder, metadata_files[0])
-        results_path = os.path.join(metric_folder, results_files[0])
-
-        # Verify metadata content
-        with open(metadata_path, encoding="utf-8") as f:
-            metadata = json.loads(f.readline())
-            assert metadata["model_id"] == "test-model", "Model ID mismatch in metadata."
-            assert metadata["model_type"] == "mock", "Model type mismatch in metadata."
-            assert "timestamp" in metadata, "Timestamp missing in metadata."
-            assert "generation_params" in metadata, "Generation parameters missing in metadata."
-
-        # Verify results content
-        with open(results_path, encoding="utf-8") as f:
-            lines = f.readlines()
-            assert len(lines) == 2, "Number of results does not match number of EvalOutputs."
-            for line, eval_input, eval_output in zip(lines, eval_inputs, eval_outputs):
-                result = json.loads(line)
-                assert (
-                    result["sample"]["inputs"] == eval_input.inputs
-                ), "Inputs mismatch in results."
-                assert (
-                    result["sample"]["output"] == eval_input.output
-                ), "Output mismatch in results."
-                assert result["feedback"] == eval_output.feedback, "Feedback mismatch in results."
-                assert result["score"] == eval_output.score, "Score mismatch in results."
-
-    # Ensure that the temporary directory and its contents are deleted
-    assert not os.path.exists(tmpdir), "Temporary directory was not deleted."
-
-
-def test_write_results_to_jsonl_empty(flow_judge_instance):
-    """Test write_results_to_jsonl with empty EvalInputs and EvalOutputs."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        flow_judge_instance.write_results_to_jsonl([], [], tmpdir)
-
-        # Construct expected metric folder name
-        metric_name = "response_correctness_binary"
-        metric_folder = os.path.join(tmpdir, metric_name)
-        assert os.path.isdir(metric_folder), "Metric folder was not created."
-
-        # List files in metric folder
-        files = os.listdir(metric_folder)
-        assert len(files) == 2, "Metadata and results files were not created."
-
-        # Identify metadata and results files
-        metadata_files = [f for f in files if f.startswith("metadata_")]
-        results_files = [f for f in files if f.startswith("results_")]
-        assert len(metadata_files) == 1, "Metadata file not found."
-        assert len(results_files) == 1, "Results file not found."
-
-        metadata_path = os.path.join(metric_folder, metadata_files[0])
-        results_path = os.path.join(metric_folder, results_files[0])
-
-        # Verify metadata content
-        with open(metadata_path, encoding="utf-8") as f:
-            metadata = json.loads(f.readline())
-            assert metadata["model_id"] == "test-model", "Model ID mismatch in metadata."
-            assert metadata["model_type"] == "mock", "Model type mismatch in metadata."
-            assert "timestamp" in metadata, "Timestamp missing in metadata."
-            assert "generation_params" in metadata, "Generation parameters missing in metadata."
-
-        # Verify results content is empty
-        with open(results_path, encoding="utf-8") as f:
-            contents = f.read()
-            assert contents == "", "Results file is not empty."
-
-    # Ensure that the temporary directory and its contents are deleted
-    assert not os.path.exists(tmpdir), "Temporary directory was not deleted."
-
-
-def test_write_results_to_jsonl_invalid_paths(flow_judge_instance):
-    """Test write_results_to_jsonl with invalid output directory paths."""
-    eval_input = EvalInput(
-        inputs=[{"question": "What is the capital of France?"}],
-        output="The capital of France is Paris.",
-    )
-    eval_output = EvalOutput(feedback="Good answer.", score=1)
-
-    # Attempt to write to a directory without write permissions
-    invalid_dir = "/root/invalid_directory"
-    with pytest.raises(PermissionError):
-        flow_judge_instance.write_results_to_jsonl([eval_input], [eval_output], invalid_dir)
+@pytest.fixture(autouse=True)
+def cleanup(request, tmp_path):
+    """Cleanup files and directories created during the test."""
+    yield
+    shutil.rmtree(tmp_path, ignore_errors=True)

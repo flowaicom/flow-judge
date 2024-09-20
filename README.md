@@ -37,27 +37,38 @@ Here's a simple example to get you started:
 ```python
 from flow_judge.models.model_factory import ModelFactory
 from flow_judge.flow_judge import EvalInput, FlowJudge
-from flow_judge.metrics import RESPONSE_CORRECTNESS_BINARY
+from flow_judge.metrics import RESPONSE_FAITHFULNESS_5POINT
 from IPython.display import Markdown, display
 
 # Create a model using ModelFactory
 model = ModelFactory.create_model("Flow-Judge-v0.1-AWQ")
 
 # Initialize the judge
-judge = FlowJudge(
-    metric=RESPONSE_CORRECTNESS_BINARY,
+faithfulness_judge = FlowJudge(
+    metric=RESPONSE_FAITHFULNESS_5POINT,
     model=model
 )
 
-# Prepare evaluation input
+# Sample to evaluate
+query = """..."""
+context = """...""""
+response = """..."""
+
+# Create an EvalInput
+# We want to evaluate the response to the customer issue based on the context and the user instructions
 eval_input = EvalInput(
-    inputs=[{"question": "What is the capital of France?"}],
-    output="The capital of France is Paris."
+    inputs=[
+        {"query": query},
+        {"context": context},
+    ],
+    output={"response": response},
 )
 
-# Perform evaluation
-result = judge.evaluate(eval_input)
-print(result)
+# Run the evaluation
+result = faithfulness_judge.evaluate(eval_input, save_results=False)
+
+# Display the result
+display(Markdown(f"__Feedback:__\n{result.feedback}\n\n__Score:__\n{result.score}"))
 ```
 
 ## Usage
@@ -69,7 +80,7 @@ print(result)
 
 ### Evaluation Metrics
 
-Flow-Judge-v0.1 was trained to handle any custom metric that can be expressed as a combination of evaluation criteria and rubric.
+Flow-Judge-v0.1 was trained to handle any custom metric that can be expressed as a combination of evaluation criteria and rubric, and required inputs and outputs.
 
 #### Pre-defined Metrics
 
@@ -109,20 +120,24 @@ with open("sample_data/csr_assistant.json", "r") as f:
 # Create a list of inputs and outputs
 inputs_batch = [
     [
-        {"user_instructions": sample["user_instructions"]},
-        {"customer_issue": sample["customer_issue"]},
-        {"context": sample["context"]}
+        {"query": sample["query"]},
+        {"context": sample["context"]},
     ]
     for sample in data
 ]
-
-outputs_batch = [sample["response"] for sample in data]
+outputs_batch = [{"response": sample["response"]} for sample in data]
 
 # Create a list of EvalInput
 eval_inputs_batch = [EvalInput(inputs=inputs, output=output) for inputs, output in zip(inputs_batch, outputs_batch)]
 
 # Run the batch evaluation
 results = faithfulness_judge.batch_evaluate(eval_inputs_batch, save_results=False)
+
+# Visualizing the results
+for i, result in enumerate(results):
+    display(Markdown(f"__Sample {i+1}:__"))
+    display(Markdown(f"__Feedback:__\n{result.feedback}\n\n__Score:__\n{result.score}"))
+    display(Markdown("---"))
 ```
 
 ## Advanced Usage
@@ -140,7 +155,9 @@ custom_metric = CustomMetric(
     rubric=[
         RubricItem(score=0, description="Poor performance"),
         RubricItem(score=1, description="Good performance"),
-    ]
+    ],
+    required_inputs=["query"],
+    required_output="response"
 )
 
 judge = FlowJudge(metric=custom_metric, config="Flow-Judge-v0.1-AWQ")

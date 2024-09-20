@@ -39,3 +39,6 @@ build/
 
 # output
 output/
+
+# data
+data/

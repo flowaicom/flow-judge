@@ -1,6 +1,8 @@
+from .base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
+from .huggingface import FlowJudgeHFModel
 from .model_configs import MODEL_CONFIGS, ModelConfig
 from .model_types import ModelType
-from .models import BaseFlowJudgeModel, FlowJudgeHFModel, FlowJudgeVLLMModel, VLLMError
+from .vllm import AsyncFlowJudgeVLLMModel, FlowJudgeVLLMModel, VLLMError
 
 
 class ModelFactory:
@@ -24,6 +26,8 @@ class ModelFactory:
             return ModelFactory._create_transformers_model(model_config)
         elif model_config.model_type == ModelType.VLLM:
             return ModelFactory._create_vllm_model(model_config)
+        elif model_config.model_type == ModelType.VLLM_ASYNC:
+            return ModelFactory._create_vllm_async_model(model_config)
         else:
             raise ValueError(f"Unsupported model type: {model_config.model_type}")
 
@@ -45,3 +49,20 @@ class ModelFactory:
             )
         except VLLMError as e:
             raise ValueError(f"Failed to create vLLM model: {e.message}") from e
+
+    @staticmethod
+    def _create_vllm_async_model(config: ModelConfig) -> AsyncFlowJudgeVLLMModel:
+        """Create and return an asynchronous vLLM-based model."""
+        try:
+            return AsyncFlowJudgeVLLMModel(
+                model=config.model_id,
+                generation_params=config.generation_params,
+                **config.vllm_kwargs,
+            )
+        except VLLMError as e:
+            raise ValueError(f"Failed to create asynchronous vLLM model: {e.message}") from e
+
+    @staticmethod
+    def is_async_model(model: BaseFlowJudgeModel | AsyncBaseFlowJudgeModel) -> bool:
+        """Check if the given model is an asynchronous model."""
+        return isinstance(model, AsyncBaseFlowJudgeModel)

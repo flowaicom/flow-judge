@@ -109,12 +109,12 @@ class AsyncFlowJudge(BaseFlowJudge):
         if not isinstance(model, AsyncBaseFlowJudgeModel):
             raise ValueError("Invalid model type. Use AsyncBaseFlowJudgeModel or its subclasses.")
 
-    async def aevaluate(self, eval_input: EvalInput, save_results: bool = False) -> EvalOutput:
+    async def async_evaluate(self, eval_input: EvalInput, save_results: bool = False) -> EvalOutput:
         """Evaluate a single EvalInput object asynchronously."""
         try:
             self._validate_inputs(eval_input)
             prompt = self._format_prompt(eval_input)
-            response = await self.model.agenerate(prompt)
+            response = await self.model.async_generate(prompt)
             eval_output = EvalOutput.parse(response)
             if save_results:
                 await asyncio.to_thread(self._save_results, [eval_input], [eval_output])
@@ -123,7 +123,7 @@ class AsyncFlowJudge(BaseFlowJudge):
             logger.error(f"Asynchronous evaluation failed: {e}")
             raise
 
-    async def abatch_evaluate(
+    async def async_batch_evaluate(
         self, eval_inputs: list[EvalInput], use_tqdm: bool = True, save_results: bool = True
     ) -> list[EvalOutput]:
         """Batch evaluate a list of EvalInput objects asynchronously."""

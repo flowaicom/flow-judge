@@ -66,7 +66,7 @@ class AsyncFlowJudgeVLLMModel(AsyncBaseFlowJudgeModel):
 
         self.generation_params = generation_params
 
-    async def agenerate(self, prompt: str) -> str:
+    async def async_generate(self, prompt: str) -> str:
         """Generate a response using the Asynchronous FlowJudge vLLM model."""
         conversation = [{"role": "user", "content": prompt.strip()}]
         prompt = self.tokenizer.apply_chat_template(
@@ -83,7 +83,7 @@ class AsyncFlowJudgeVLLMModel(AsyncBaseFlowJudgeModel):
 
         return ""  # Return empty string if no output is generated
 
-    async def abatch_generate(
+    async def async_batch_generate(
         self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
     ) -> list[str]:
         """Generate responses for multiple prompts asynchronously."""

@@ -42,12 +42,12 @@ class AsyncBaseFlowJudgeModel(ABC):
         }
 
     @abstractmethod
-    async def agenerate(self, prompt: str) -> str:
+    async def async_generate(self, prompt: str) -> str:
         """Generate a response based on the given prompt asynchronously."""
         pass
 
     @abstractmethod
-    async def abatch_generate(
+    async def async_batch_generate(
         self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
     ) -> list[str]:
         """Generate responses for multiple prompts asynchronously."""

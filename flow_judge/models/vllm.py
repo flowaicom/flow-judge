@@ -1,5 +1,6 @@
 from typing import Any
 
+import torch
 from transformers import AutoTokenizer
 from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
 
@@ -13,6 +14,14 @@ class FlowJudgeVLLMModel(BaseFlowJudgeModel):
         """Initialize the FlowJudge vLLM model."""
         super().__init__(model, "vllm", generation_params, **vllm_kwargs)
         try:
+            if not torch.cuda.is_available():
+                raise VLLMError(
+                    status_code=2,
+                    message="GPU is not available. \
+                    vLLM requires a GPU to run. \
+                    Check https://docs.vllm.ai/en/latest/getting_started/installation.html \
+                    for installation requirements.",
+                )
             self.model = LLM(model=model, **vllm_kwargs)
             self.tokenizer = AutoTokenizer.from_pretrained(model)
         except ImportError as e:
@@ -55,6 +64,14 @@ class AsyncFlowJudgeVLLMModel(AsyncBaseFlowJudgeModel):
         """Initialize the Asynchronous FlowJudge vLLM model."""
         super().__init__(model, "vllm_async", generation_params, **vllm_kwargs)
         try:
+            if not torch.cuda.is_available():
+                raise VLLMError(
+                    status_code=2,
+                    message="GPU is not available. \
+                        vLLM requires a GPU to run. \
+                        Check https://docs.vllm.ai/en/latest/getting_started/installation.html \
+                        for installation requirements.",
+                )
             engine_args = AsyncEngineArgs(model=model, **vllm_kwargs)
             self.engine = AsyncLLMEngine.from_engine_args(engine_args)
             self.tokenizer = AutoTokenizer.from_pretrained(model)

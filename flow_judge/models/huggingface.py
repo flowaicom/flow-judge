@@ -1,7 +1,9 @@
 import logging
+import os
 from typing import Any
 
 import torch
+from huggingface_hub import snapshot_download
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -17,8 +19,17 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
     def __init__(self, model_id: str, generation_params: dict[str, Any], **hf_kwargs: Any):
         """Initialize the FlowJudge Hugging Face Transformers model."""
         super().__init__(model_id, "transformers", generation_params, **hf_kwargs)
+
+        os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
+        # Download the entire repository
+        logger.info(
+            "Downloading the model from Hugging Face Hub using hf-transfer for faster downloads..."
+        )
+        snapshot_download(repo_id=model_id)
+
         self.model = AutoModelForCausalLM.from_pretrained(model_id, **hf_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, **hf_kwargs)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.generation_params = generation_params
 

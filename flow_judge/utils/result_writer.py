@@ -4,6 +4,7 @@ import os
 import re
 from datetime import datetime, timezone
 
+import flow_judge
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def write_results_to_disk(
     fmt_model_id = model_metadata["model_id"].replace("/", "__")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%f")[:-3]
     metadata = {
-        "library_version": "flow_judge.__version__",  # Replace with actual version import
+        "library_version": f"{flow_judge.__version__}",
         "timestamp": timestamp,
         **model_metadata,
     }

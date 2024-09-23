@@ -7,6 +7,9 @@ venv/
 env/
 .venv/
 
+# uv
+uv.lock
+
 # IDE settings
 .vscode/
 .idea/

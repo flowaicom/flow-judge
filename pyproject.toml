@@ -20,16 +20,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 keywords = ["LM-judge", "evaluation", "LLMs", "AI", "benchmarking"]
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.9.1",
-    "transformers>=4.44.2",
-    "torch>=2.3.0",
     "requests>=2.32.3",
-    "bitsandbytes>=0.41.0,<=0.42.0",
-    "accelerate>=0.34.2",
-    "flash-attn>=2.6.3",
-    "fsspec>=2024.6.1",
-    "pyarrow<15.0.0,>=14.0.1"
+    "hf-transfer>=0.1.1",
+    "ipykernel>=6.29.0",
+    "ipywidgets>=8.1.0",
 ]
 
 [project.optional-dependencies]
@@ -40,7 +37,14 @@ dev = [
     "black",
     "isort",
 ]
+hf = [
+    "transformers>=4.44.2",
+    "torch>=2.3.0",
+    "bitsandbytes>=0.41.0,<=0.42.0",
+    "accelerate>=0.34.2",
+]
 vllm = ["vllm>=0.6.0"]
+flash-attn = ["flash-attn>=2.6.3"]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

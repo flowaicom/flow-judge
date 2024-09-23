@@ -19,7 +19,7 @@ class ModelConfig:
         self.generation_params = generation_params
         if model_type == ModelType.TRANSFORMERS:
             self.hf_kwargs = kwargs
-        elif model_type == ModelType.VLLM:
+        elif model_type == ModelType.VLLM or model_type == ModelType.VLLM_ASYNC:
             self.vllm_kwargs = kwargs
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
@@ -63,6 +63,7 @@ MODEL_CONFIGS = {
             "top_p": 0.95,
             "max_new_tokens": 1000,
             "do_sample": True,
+            "max_length": 8192,
         },
         device_map="auto",
         torch_dtype="bfloat16",
@@ -76,9 +77,21 @@ MODEL_CONFIGS = {
             "top_p": 0.95,
             "max_new_tokens": 1000,
             "do_sample": True,
+            "max_length": 8192,
         },
         device_map="auto",
         torch_dtype="bfloat16",
+    ),
+    "Flow-Judge-v0.1-AWQ-Async": ModelConfig(
+        model_id="flowaicom/Flow-Judge-v0.1-AWQ",
+        model_type=ModelType.VLLM_ASYNC,
+        generation_params={"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
+        max_model_len=8192,
+        trust_remote_code=True,
+        enforce_eager=True,
+        dtype="bfloat16",
+        disable_sliding_window=True,
+        disable_log_requests=False,
     ),
 }
 

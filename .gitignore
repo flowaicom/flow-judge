@@ -7,6 +7,9 @@ venv/
 env/
 .venv/
 
+# uv
+uv.lock
+
 # IDE settings
 .vscode/
 .idea/
@@ -39,3 +42,6 @@ build/
 
 # output
 output/
+
+# data
+data/

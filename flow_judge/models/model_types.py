@@ -6,3 +6,4 @@ class ModelType(Enum):
 
     TRANSFORMERS = "transformers"
     VLLM = "vllm"
+    VLLM_ASYNC = "vllm_async"

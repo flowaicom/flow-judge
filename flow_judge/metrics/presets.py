@@ -1,20 +1,4 @@
-from pydantic import BaseModel
-
-
-class RubricItem(BaseModel):
-    """Represents an item in the evaluation rubric."""
-
-    score: int
-    description: str
-
-
-class Metric(BaseModel):
-    """Represents an evaluation metric."""
-
-    name: str
-    criteria: str
-    rubric: list[RubricItem]
-
+from .metric import Metric, RubricItem
 
 # Pre-defined metrics
 RESPONSE_CORRECTNESS_BINARY = Metric(
@@ -37,6 +21,8 @@ from the reference with no inaccuracies, extra details, or missing details. The 
 by the generated response is equivalent to the reference.""",
         ),
     ],
+    required_inputs=["query", "reference_answer"],
+    required_output="response",
 )
 
 RESPONSE_CORRECTNESS_3POINT = Metric(
@@ -65,6 +51,8 @@ the query, containing all the relevant information from the reference without an
 extraneous details.""",
         ),
     ],
+    required_inputs=["query", "reference_answer"],
+    required_output="response",
 )
 
 RESPONSE_CORRECTNESS_5POINT = Metric(
@@ -104,6 +92,8 @@ The response perfectly matches the accuracy and level of detail of the reference
 containing all key information to comprehensively answer the query.""",
         ),
     ],
+    required_inputs=["query", "reference_answer"],
+    required_output="response",
 )
 
 RESPONSE_FAITHFULNESS_BINARY = Metric(
@@ -127,6 +117,8 @@ inferable from the provided context. There is no hallucinated or fabricated info
 the response that cannot be traced back to or deduced from the context.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
 
 RESPONSE_FAITHFULNESS_3POINT = Metric(
@@ -158,6 +150,8 @@ claims are directly supported by the information given, without any hallucinated
 content present. The response accurately represents only the facts in the context.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
 
 RESPONSE_FAITHFULNESS_5POINT = Metric(
@@ -203,6 +197,8 @@ the response are directly supported by the context, without any hallucinated or 
 information.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
 
 RESPONSE_RELEVANCE_BINARY = Metric(
@@ -226,6 +222,8 @@ answering the question asked, without going off-topic or providing unnecessary a
 information beyond what the query requires.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
 
 RESPONSE_RELEVANCE_3POINT = Metric(
@@ -256,6 +254,8 @@ comprehensively answer the query. No irrelevant or extraneous information is inc
 response is fully pertinent to the query.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
 
 RESPONSE_RELEVANCE_5POINT = Metric(
@@ -295,21 +295,6 @@ The response is highly relevant to the query, addressing all key aspects directl
 without any irrelevant or extraneous information.""",
         ),
     ],
+    required_inputs=["query", "context"],
+    required_output="response",
 )
-
-# Add more pre-defined metrics as needed
-
-
-class CustomMetric(Metric):
-    """Represents a custom evaluation metric."""
-
-    def __init__(self, name: str, criteria: str, rubric: list[RubricItem]):
-        """Initialize a custom metric."""
-        super().__init__(name=name, criteria=criteria, rubric=rubric)
-
-
-def list_all_metrics():
-    """List all metric variable names."""
-    return [
-        name for name, value in globals().items() if isinstance(value, Metric) and name.isupper()
-    ]

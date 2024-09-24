@@ -141,17 +141,6 @@ def test_eval_input_validation(mock_model):
         judge.evaluate(invalid_output)
 
 
-def test_eval_output_parsing():
-    """Test EvalOutput parsing."""
-    valid_response = "<feedback>Test feedback</feedback>\n<score>1</score>"
-    parsed = EvalOutput.parse(valid_response)
-    assert parsed.feedback == "Test feedback"
-    assert parsed.score == 1
-
-    with pytest.raises(ValueError):
-        EvalOutput.parse("Invalid response")
-
-
 def test_format_vars():
     """Test format_vars function."""
     variables = [{"question": "What is 2+2?"}, {"context": "Math basics"}]
@@ -191,6 +180,29 @@ def test_format_prompt(mock_model):
         RUBRIC=format_rubric(RESPONSE_CORRECTNESS_BINARY.rubric),
     )
     assert prompt == expected_prompt
+
+
+def test_eval_output_parse_fail_on_parse_error():
+    """Test EvalOutput.parse with fail_on_parse_error."""
+    # Invalid response without proper tags
+    invalid_response = "This is an invalid response without proper tags"
+
+    # Test with fail_on_parse_error=False (default behavior)
+    result = EvalOutput.parse(invalid_response)
+    assert isinstance(result, EvalOutput)
+    assert result.feedback == "Error"
+    assert result.score == -1
+
+    # Test with fail_on_parse_error=True
+    with pytest.raises(ValueError):
+        EvalOutput.parse(invalid_response, fail_on_parse_error=True)
+
+    # Test with valid response
+    valid_response = "<feedback>Good job!</feedback><score>5</score>"
+    result = EvalOutput.parse(valid_response)
+    assert isinstance(result, EvalOutput)
+    assert result.feedback == "Good job!"
+    assert result.score == 5
 
 
 @pytest.fixture(autouse=True)

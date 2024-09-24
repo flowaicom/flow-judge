@@ -83,15 +83,26 @@ class FlowJudge(BaseFlowJudge):
             raise
 
     def batch_evaluate(
-        self, eval_inputs: list[EvalInput], use_tqdm: bool = True, save_results: bool = True
+        self,
+        eval_inputs: list[EvalInput],
+        use_tqdm: bool = True,
+        save_results: bool = True,
+        fail_on_parse_error: bool = False,
     ) -> list[EvalOutput]:
         """Batch evaluate a list of EvalInput objects."""
         self._validate_inputs(eval_inputs)
         prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
         responses = self.model.batch_generate(prompts, use_tqdm=use_tqdm)
-        eval_outputs = [EvalOutput.parse(response) for response in responses]
+        eval_outputs = [
+            EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
+            for response in responses
+        ]
+        parse_failures = sum(1 for output in eval_outputs if output.score == -1)
         if save_results:
             self._save_results(eval_inputs, eval_outputs)
+        if parse_failures > 0:
+            logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")
+
         return eval_outputs
 
 
@@ -124,7 +135,25 @@ class AsyncFlowJudge(BaseFlowJudge):
             raise
 
     async def async_batch_evaluate(
-        self, eval_inputs: list[EvalInput], use_tqdm: bool = True, save_results: bool = True
+        self,
+        eval_inputs: list[EvalInput],
+        use_tqdm: bool = True,
+        save_results: bool = True,
+        fail_on_parse_error: bool = False,
     ) -> list[EvalOutput]:
         """Batch evaluate a list of EvalInput objects asynchronously."""
-        raise NotImplementedError("Asynchronous batched evaluation is not implemented.")
+        self._validate_inputs(eval_inputs)
+        prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
+        responses = await self.model.async_batch_generate(prompts, use_tqdm=use_tqdm)
+        eval_outputs = [
+            EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
+            for response in responses
+        ]
+        parse_failures = sum(1 for output in eval_outputs if output.score == -1)
+        if save_results:
+            await asyncio.to_thread(self._save_results, eval_inputs, eval_outputs)
+
+        if parse_failures > 0:
+            logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")
+
+        return eval_outputs

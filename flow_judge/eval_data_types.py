@@ -1,6 +1,9 @@
+import logging
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class EvalInput(BaseModel):
@@ -16,28 +19,26 @@ class EvalOutput(BaseModel):
     feedback: str = Field(..., description="Feedback from the evaluation")
     score: int = Field(..., description="Numeric score from the evaluation")
 
-    @field_validator("score")
     @classmethod
-    def score_must_be_non_negative(cls, v):
-        """Validate that the score is non-negative."""
-        if v < 0:
-            raise ValueError("Score must be non-negative")
-        return v
-
-    @classmethod
-    def parse(cls, response: str) -> "EvalOutput":
+    def parse(cls, response: str, fail_on_parse_error: bool = False) -> "EvalOutput":
         """Parse the evaluation response from the judge."""
-        # Compile regex patterns
-        feedback_pattern = re.compile(r"<feedback>\s*(.*?)\s*</feedback>", re.DOTALL)
-        score_pattern = re.compile(r"<score>\s*(\d+)\s*</score>", re.DOTALL)
+        try:
+            # Compile regex patterns
+            feedback_pattern = re.compile(r"<feedback>\s*(.*?)\s*</feedback>", re.DOTALL)
+            score_pattern = re.compile(r"<score>\s*(\d+)\s*</score>", re.DOTALL)
 
-        feedback_match = feedback_pattern.search(response)
-        score_match = score_pattern.search(response)
+            feedback_match = feedback_pattern.search(response)
+            score_match = score_pattern.search(response)
 
-        if not feedback_match or not score_match:
-            raise ValueError("Failed to parse evaluation response. Response: " + response)
+            if not feedback_match or not score_match:
+                raise ValueError("Failed to parse evaluation response.")
 
-        feedback = feedback_match.group(1).strip()
-        score = int(score_match.group(1).strip())
+            feedback = feedback_match.group(1).strip()
+            score = int(score_match.group(1).strip())
 
-        return cls(feedback=feedback, score=score)
+            return cls(feedback=feedback, score=score)
+        except Exception as e:
+            if fail_on_parse_error:
+                raise ValueError(f"Failed to parse evaluation response: {e}") from e
+            logger.warning(f"Parsing failed for response: {response}. Error: {e}")
+            return EvalOutput(feedback="Error", score=-1)

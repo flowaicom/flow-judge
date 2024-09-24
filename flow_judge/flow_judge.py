@@ -32,7 +32,7 @@ class BaseFlowJudge:
         """Format the prompt for a single evaluation input."""
         prompt_variables = {
             "INPUTS": format_vars(eval_input.inputs),
-            "OUTPUT": eval_input.output,
+            "OUTPUT": format_vars([eval_input.output]),
             "EVALUATION_CRITERIA": self.metric.criteria,
             "RUBRIC": format_rubric(self.metric.rubric),
         }

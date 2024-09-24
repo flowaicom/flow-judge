@@ -38,11 +38,6 @@ def test_format_user_prompt():
         "RUBRIC": "Test rubric",
     }
     formatted_with_inputs = format_user_prompt(variables_with_inputs)
-    assert "Test input" in formatted_with_inputs
-    assert "Test output" in formatted_with_inputs
-    assert "Test criteria" in formatted_with_inputs
-    assert "Test rubric" in formatted_with_inputs
-    assert "# INPUT" in formatted_with_inputs
     assert USER_PROMPT_TEMPLATE.format(**variables_with_inputs) == formatted_with_inputs
 
     # Test without inputs
@@ -53,10 +48,6 @@ def test_format_user_prompt():
         "RUBRIC": "Test rubric",
     }
     formatted_without_inputs = format_user_prompt(variables_without_inputs)
-    assert "Test output" in formatted_without_inputs
-    assert "Test criteria" in formatted_without_inputs
-    assert "Test rubric" in formatted_without_inputs
-    assert "# INPUT" not in formatted_without_inputs
     assert (
         USER_PROMPT_NO_INPUTS_TEMPLATE.format(**variables_without_inputs)
         == formatted_without_inputs

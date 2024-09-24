@@ -7,7 +7,7 @@ from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.flow_judge import FlowJudge
 from flow_judge.metrics import RESPONSE_CORRECTNESS_BINARY, CustomMetric, RubricItem
 from flow_judge.models.base import BaseFlowJudgeModel
-from flow_judge.utils.prompt_formatter import format_rubric, format_vars
+from flow_judge.utils.prompt_formatter import USER_PROMPT_TEMPLATE, format_rubric, format_vars
 
 
 class MockFlowJudgeModel(BaseFlowJudgeModel):
@@ -172,6 +172,25 @@ def test_format_rubric():
     expected = """- Score 0: Poor
 - Score 1: Good"""
     assert expected == formatted
+
+
+def test_format_prompt(mock_model):
+    """Test FlowJudge._format_prompt."""
+    eval_input = EvalInput(
+        inputs=[{"query": "Test query"}, {"reference_answer": "Test reference"}],
+        output={"response": "Test response"},
+    )
+
+    judge = FlowJudge(metric=RESPONSE_CORRECTNESS_BINARY, model=mock_model)
+    prompt = judge._format_prompt(eval_input)
+
+    expected_prompt = USER_PROMPT_TEMPLATE.format(
+        INPUTS=format_vars(eval_input.inputs),
+        OUTPUT=format_vars([eval_input.output]),
+        EVALUATION_CRITERIA=RESPONSE_CORRECTNESS_BINARY.criteria,
+        RUBRIC=format_rubric(RESPONSE_CORRECTNESS_BINARY.rubric),
+    )
+    assert prompt == expected_prompt
 
 
 @pytest.fixture(autouse=True)

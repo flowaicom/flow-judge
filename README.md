@@ -3,19 +3,17 @@
   <img src="img/flow_judge_banner.png" alt="Flow Judge Banner">
 </p>
 
-<p align="center">
-  <ul style="list-style-type: none; padding: 0; margin: 0; font-family: 'Courier New', Courier, monospace; text-align: center;">
-    <li><strong>
-      <a href="https://www.flow-ai.com/judge">Technical Report</a> |
-      <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
-      <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
-      <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Examples</a>
-    </strong>
-    </li>
-    <li>
-        <code>flow-judge</code> is a lightweight library for evaluating LLM applications with <code>Flow-Judge-v0.1</code>.
-    </li>
-  </ul>
+<p align="center" style="font-family: 'Courier New', Courier, monospace;">
+  <strong>
+    <a href="https://www.flow-ai.com/judge">Technical Report</a> |
+    <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
+    <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
+    <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Examples</a>
+  </strong>
+</p>
+
+<p align="center" style="font-family: 'Courier New', Courier, monospace;">
+  <code>flow-judge</code> is a lightweight library for evaluating LLM applications with <code>Flow-Judge-v0.1</code>.
 </p>
 
 ## Model

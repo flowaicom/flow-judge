@@ -44,7 +44,6 @@ hf = [
     "accelerate>=0.34.2",
 ]
 vllm = ["vllm>=0.6.0"]
-flash-attn = ["flash-attn>=2.6.3"]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

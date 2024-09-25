@@ -1,12 +1,28 @@
 # `flow-judge`
-<body>
-    <ul style="font-family: 'Courier New', Courier, monospace;">
-        <strong><a href="https://www.flow-ai.com/judge">Flow-Judge-v0.1</a> | <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights on Hugging Face </a></strong>
-    </ul>
-</body>
-</html>
+<p align="center">
+  <img src="img/flow_judge_banner.png" alt="Flow Judge Banner">
+</p>
 
+<p align="center">
+  <ul style="list-style-type: none; padding: 0; margin: 0; font-family: 'Courier New', Courier, monospace; text-align: center;">
+    <li><strong>
+      <a href="https://www.flow-ai.com/judge">Technical Report</a> |
+      <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
+      <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
+      <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Examples</a>
+    </strong>
+    </li>
+    <li>
+        <code>flow-judge</code> is a lightweight library for evaluating LLM applications with <code>Flow-Judge-v0.1</code>.
+    </li>
+  </ul>
+</p>
+
+## Model
 `Flow-Judge-v0.1` is an open, small yet powerful language model evaluator trained on a synthetic dataset containing LLM system evaluation data by Flow AI.
+
+You can learn more about the unique features of our model in the [technical report](https://www.flow-ai.com/blog/flow-judge#flow-judge-an-open-small-language-model-for-llm-system-evaluations).
+
 
 ## Features of the library
 
@@ -15,20 +31,21 @@
 - Pre-defined evaluation metrics
 - Ease of custom metric and rubric creation
 - Batched evaluation for efficient processing
+- Integrations with most popular frameworks like Llama Index
 
 ## Installation
 
 Install flow-judge using pip:
 
 ```bash
-pip install -e .
+pip install -e ".[vllm,hf]"
+pip install 'flash_attn>=2.6.3' --no-build-isolation
 ```
 
-For vLLM support, install with optional dependencies (Recommended):
-
-```bash
-pip install -e ".[vllm]"
-```
+Extras available:
+- `dev` for development dependencies
+- `hf` for Hugging Face Transformers support
+- `vllm` for vLLM support
 
 ## Quick Start
 
@@ -142,6 +159,12 @@ for i, result in enumerate(results):
 
 ## Advanced Usage
 
+### Model configurations
+
+We currently support vLLM engine (recommended) and Hugging Face Transformers.
+
+We are working on adding API-based usage as well as better options for CPU.
+
 ### Custom Metrics
 
 Create your own evaluation metrics:
@@ -163,6 +186,11 @@ custom_metric = CustomMetric(
 judge = FlowJudge(metric=custom_metric, config="Flow-Judge-v0.1-AWQ")
 ```
 
+### Integrations
+
+We support an integration with `Llama Index` evaluation module. See an tutorial [here](https://github.com/flowaicom/flow-judge/blob/main/examples/4_llama_index_evaluators.ipynb).
+
+> Note that we are currently working on adding more integrations with other frameworks in the near future.
 ## Development Setup
 
 1. Clone the repository:

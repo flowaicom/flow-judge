@@ -38,12 +38,12 @@ dev = [
     "isort",
 ]
 hf = [
-    "transformers>=4.44.2",
+    "transformers>=4.45.0",
     "torch>=2.3.0",
     "bitsandbytes>=0.41.0,<=0.42.0",
     "accelerate>=0.34.2",
 ]
-vllm = ["vllm>=0.6.0"]
+vllm = ["vllm>=0.6.2"]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

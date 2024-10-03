@@ -188,7 +188,9 @@ judge = FlowJudge(metric=custom_metric, config="Flow-Judge-v0.1-AWQ")
 
 ### Integrations
 
-We support an integration with `Llama Index` evaluation module. See an tutorial [here](https://github.com/flowaicom/flow-judge/blob/main/examples/4_llama_index_evaluators.ipynb).
+We support an integration with Llama Index evaluation module and Haystack:
+- [Llama Index tutorial](https://github.com/flowaicom/flow-judge/blob/main/examples/4_llama_index_evaluators.ipynb)
+- [Haystack tutorial](https://github.com/flowaicom/flow-judge/blob/main/examples/5_evaluate_haystack_rag_pipeline.ipynb)
 
 > Note that we are currently working on adding more integrations with other frameworks in the near future.
 ## Development Setup

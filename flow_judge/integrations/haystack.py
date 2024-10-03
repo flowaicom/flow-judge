@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import numpy as np
 from haystack import component, default_from_dict, default_to_dict
 from haystack.utils import deserialize_type
 
@@ -93,7 +94,12 @@ class HaystackFlowJudge:
                 to be a list of str but received {outputs}."
             raise ValueError(msg)
 
-    @component.output_types(results=list[dict[str, Any]])
+    @component.output_types(
+        results=list[dict[str, Any]],
+        metadata=dict[str, Any],
+        score=float,
+        individual_scores=list[float],
+    )
     def run(self, **inputs) -> dict[str, Any]:
         """Run the FlowJudge evaluator on the provided inputs."""
         self._validate_input_parameters(dict(self.inputs), inputs)
@@ -124,7 +130,15 @@ class HaystackFlowJudge:
 
         metadata = self.model.metadata
 
-        return {"results": results, "metadata": metadata}
+        score = np.mean([result["score"] for result in results])
+        individual_scores = [float(result["score"]) for result in results]
+
+        return {
+            "results": results,
+            "metadata": metadata,
+            "score": score,
+            "individual_scores": individual_scores,
+        }
 
     @staticmethod
     def _validate_input_parameters(expected: dict[str, Any], received: dict[str, Any]) -> None:

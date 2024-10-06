@@ -45,3 +45,5 @@ output/
 
 # data
 data/
+
+.cache

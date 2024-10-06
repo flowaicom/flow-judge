@@ -44,6 +44,10 @@ hf = [
     "accelerate>=0.34.2",
 ]
 vllm = ["vllm>=0.6.2"]
+llamafile = [
+    "tqdm>=4.66.1",
+    "openai>=1.51.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

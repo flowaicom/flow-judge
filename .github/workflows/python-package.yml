@@ -35,7 +35,7 @@ jobs:
         isort --check-only --diff . || true
     - name: Test with pytest and generate coverage
       run: |
-        pytest --cov=./ --cov-report=xml
+        pytest --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

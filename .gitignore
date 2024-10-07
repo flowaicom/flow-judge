@@ -47,3 +47,6 @@ output/
 data/
 
 .cache
+
+flake.nix
+flake.lock

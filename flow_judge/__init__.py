@@ -5,6 +5,7 @@ from flow_judge.flow_judge import AsyncFlowJudge, FlowJudge
 from flow_judge.metrics import CustomMetric, Metric, RubricItem, list_all_metrics
 from flow_judge.models.common import BaseFlowJudgeModel
 from flow_judge.utils.prompt_formatter import format_rubric, format_user_prompt, format_vars
+from flow_judge.models import Llamafile, Vllm, Hf
 
 try:
     __version__ = version("flow-judge")
@@ -24,6 +25,9 @@ __all__ = [
     "CustomMetric",
     "BaseFlowJudgeModel",
     "EvalOutput",
+    "Llamafile",
+    "Vllm",
+    "Hf",
 ]
 
 # Add all metric names to __all__

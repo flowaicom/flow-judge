@@ -28,7 +28,7 @@ class LlamafileConfig(ModelConfig):
         model_id: str,
         generation_params: Dict[str, Any],
         model_filename: str = "flow-judge.llamafile",
-        cache_dir: str = "~/.cache/flow-judge",
+        cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
         disable_kv_offload: bool = False,
         llamafile_kvargs: str = "",
@@ -46,7 +46,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         self,
         model: str = None,
         generation_params: dict[str, Any] = None,
-        cache_dir: str = "~/.cache/flow-judge",
+        cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
         disable_kv_offload: bool = False,
         llamafile_kvargs: str = "",
@@ -59,10 +59,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             "temperature": 0.1,
             "top_p": 0.95,
             "max_tokens": 2000,
-            "context_size": 16384,
+            "context_size": 8192,
             "gpu_layers": 34,
-            "thread_count": 32,
-            "batch_size": 32,
+            "thread_count": os.cpu_count() or 1,
+            "batch_size": 32, # here batch doesn't mean parallel requests, it's just the batch size for the llamafile server
             "max_concurrent_requests": 1,
             "stop": ["<|endoftext|>"]
         }
@@ -105,7 +105,6 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         self.metadata = {
             "model_id": model,
             "model_type": "llamafile",
-            # ... other metadata ...
         }
 
     def is_server_running(self):
@@ -268,7 +267,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         )
         return response.choices[0].message.content.strip()
 
-    async def async_generate(self, prompt: str) -> str:
+    async def _async_generate(self, prompt: str) -> str:
         self._ensure_server_running()
         response = await self.async_client.chat.completions.create(
             model="flow-judge",
@@ -287,9 +286,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def _batch_generate(self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any) -> List[str]:
         self._ensure_server_running()
-        return [self.generate(prompt) for prompt in prompts]
+        return [self._generate(prompt) for prompt in prompts]
 
-    async def async_batch_generate(
+    async def _async_batch_generate(
         self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
     ) -> List[str]:
         self._ensure_server_running()
@@ -298,7 +297,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         async def generate_with_semaphore(prompt):
             async with semaphore:
-                return await self.async_generate(prompt)
+                return await self._async_generate(prompt)
 
         return await asyncio.gather(*[generate_with_semaphore(prompt) for prompt in prompts])
 

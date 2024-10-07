@@ -73,7 +73,7 @@ class FlowJudge(BaseFlowJudge):
         try:
             self._validate_inputs(eval_input)
             prompt = self._format_prompt(eval_input)
-            response = self.model._generate(prompt)
+            response = self.model.generate(prompt)
             eval_output = EvalOutput.parse(response)
             if save_results:
                 self._save_results([eval_input], [eval_output])
@@ -125,7 +125,7 @@ class AsyncFlowJudge(BaseFlowJudge):
         try:
             self._validate_inputs(eval_input)
             prompt = self._format_prompt(eval_input)
-            response = await self.model.async_generate(prompt)
+            response = await self.model._async_generate(prompt)
             eval_output = EvalOutput.parse(response)
             if save_results:
                 await asyncio.to_thread(self._save_results, [eval_input], [eval_output])
@@ -144,7 +144,7 @@ class AsyncFlowJudge(BaseFlowJudge):
         """Batch evaluate a list of EvalInput objects asynchronously."""
         self._validate_inputs(eval_inputs)
         prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
-        responses = await self.model.async_batch_generate(prompts, use_tqdm=use_tqdm)
+        responses = await self.model._async_batch_generate(prompts, use_tqdm=use_tqdm)
         eval_outputs = [
             EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
             for response in responses

@@ -5,8 +5,7 @@ from transformers import AutoTokenizer
 from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
 
 from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.models.model_configs import ModelConfig
-from flow_judge.models.common import ModelType
+from flow_judge.models.common import ModelType, ModelConfig
 
 import asyncio
 
@@ -22,7 +21,7 @@ class VllmConfig(ModelConfig):
         disable_sliding_window: bool = True,
         gpu_memory_utilization: float = 0.90,
         max_num_seqs: int = 256,
-        quantization: bool = False,
+        quantization: bool = True,
         exec_async: bool = False,
         **kwargs: Any
     ):
@@ -42,7 +41,7 @@ class VllmConfig(ModelConfig):
 class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for vLLM supporting both sync and async operations."""
 
-    def __init__(self, model: str = None, generation_params: dict[str, Any] = None, quantized: bool = False, exec_async: bool = False, **kwargs: Any):
+    def __init__(self, model: str = None, generation_params: dict[str, Any] = None, quantized: bool = True, exec_async: bool = False, **kwargs: Any):
         """Initialize the FlowJudge vLLM model."""
         base_model_id = "flowaicom/Flow-Judge-v0.1"
         model_id = f"{base_model_id}-AWQ" if quantized else base_model_id
@@ -72,11 +71,24 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                     message="GPU is not available. vLLM requires a GPU to run. Check https://docs.vllm.ai/en/latest/getting_started/installation.html for installation requirements.",
                 )
 
+            engine_args = {
+                "model": model,
+                "max_model_len": config.max_model_len,
+                "trust_remote_code": config.trust_remote_code,
+                "enforce_eager": config.enforce_eager,
+                "dtype": config.dtype,
+                "disable_sliding_window": config.disable_sliding_window,
+                "gpu_memory_utilization": config.gpu_memory_utilization,
+                "max_num_seqs": config.max_num_seqs,
+                "quantization": "awq_marlin" if config.quantization else None,
+                **kwargs
+            }
+
             if exec_async:
-                engine_args = AsyncEngineArgs(model=model, **kwargs)
-                self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+                engine_args["disable_log_requests"] = kwargs.get("disable_log_requests", False)
+                self.engine = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(**engine_args))
             else:
-                self.model = LLM(model=model, **kwargs)
+                self.model = LLM(**engine_args)
 
             self.tokenizer = AutoTokenizer.from_pretrained(model)
         except ImportError as e:

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 
 import torch
 from transformers import AutoTokenizer
@@ -8,62 +8,57 @@ from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from flow_judge.models.model_configs import ModelConfig
 from flow_judge.models.common import ModelType
 
-_VllmConfig = ModelConfig(
-    model_id="flowaicom/Flow-Judge-v0.1",
-    model_type=ModelType.VLLM,
-    generation_params={"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
-    max_model_len=8192,
-    trust_remote_code=True,
-    enforce_eager=True,
-    dtype="bfloat16",
-    disable_sliding_window=True,
-    gpu_memory_utilization=0.90,
-    max_num_seqs=256,
-)
-
-_VllmAwqConfig = ModelConfig(
-    model_id="flowaicom/Flow-Judge-v0.1-AWQ",
-    model_type=ModelType.VLLM,
-    generation_params={"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
-    max_model_len=8192,
-    trust_remote_code=True,
-    enforce_eager=True,
-    dtype="bfloat16",
-    disable_sliding_window=True,
-    gpu_memory_utilization=0.90,
-    max_num_seqs=256,
-    quantization="awq_marlin",
-)
-
-_VllmAwqAsyncConfig = ModelConfig(
-    model_id="flowaicom/Flow-Judge-v0.1-AWQ",
-    model_type=ModelType.VLLM_ASYNC,
-    generation_params={"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
-    max_model_len=8192,
-    trust_remote_code=True,
-    enforce_eager=True,
-    dtype="bfloat16",
-    disable_sliding_window=True,
-    disable_log_requests=False,
-)
-
 import asyncio
+
+class VllmConfig(ModelConfig):
+    def __init__(
+        self,
+        model_id: str,
+        generation_params: Dict[str, Any] = {"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
+        max_model_len: int = 8192,
+        trust_remote_code: bool = True,
+        enforce_eager: bool = True,
+        dtype: str = "bfloat16",
+        disable_sliding_window: bool = True,
+        gpu_memory_utilization: float = 0.90,
+        max_num_seqs: int = 256,
+        quantization: bool = False,
+        exec_async: bool = False,
+        **kwargs: Any
+    ):
+        model_type = ModelType.VLLM_ASYNC if exec_async else ModelType.VLLM
+        super().__init__(model_id, model_type, generation_params, **kwargs)
+        self.max_model_len = max_model_len
+        self.trust_remote_code = trust_remote_code
+        self.enforce_eager = enforce_eager
+        self.dtype = dtype
+        self.disable_sliding_window = disable_sliding_window
+        self.gpu_memory_utilization = gpu_memory_utilization
+        self.max_num_seqs = max_num_seqs
+        self.quantization = quantization
+        self.exec_async = exec_async
+
 
 class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for vLLM supporting both sync and async operations."""
 
     def __init__(self, model: str = None, generation_params: dict[str, Any] = None, quantized: bool = False, exec_async: bool = False, **kwargs: Any):
         """Initialize the FlowJudge vLLM model."""
-        if exec_async:
-            config = _VllmAwqAsyncConfig
-        elif quantized:
-            config = _VllmAwqConfig
-        else:
-            config = _VllmConfig
+        base_model_id = "flowaicom/Flow-Judge-v0.1"
+        model_id = f"{base_model_id}-AWQ" if quantized else base_model_id
+        model = model or model_id
 
-        model = model or config.model_id
+        config = VllmConfig(
+            model_id=model,
+            quantization=quantized,
+            exec_async=exec_async,
+            **kwargs
+        )
+
         generation_params = generation_params or config.generation_params
-        kwargs = {**config.vllm_kwargs, **kwargs}
+
+        if exec_async:
+            kwargs["disable_log_requests"] = False
 
         super().__init__(model, "vllm", generation_params, **kwargs)
 
@@ -72,7 +67,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         try:
             if not torch.cuda.is_available():
-                raise VLLMError(
+                raise VllmError(
                     status_code=2,
                     message="GPU is not available. vLLM requires a GPU to run. Check https://docs.vllm.ai/en/latest/getting_started/installation.html for installation requirements.",
                 )
@@ -85,7 +80,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
             self.tokenizer = AutoTokenizer.from_pretrained(model)
         except ImportError as e:
-            raise VLLMError(
+            raise VllmError(
                 status_code=1,
                 message="Failed to import 'vllm' package. Make sure it is installed correctly.",
             ) from e
@@ -160,12 +155,11 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         if self.exec_async:
             self.engine.shutdown_background_loop()
 
-# Keep the VLLMError class as is
-class VLLMError(Exception):
-    """Custom exception for VLLM-related errors."""
+class VllmError(Exception):
+    """Custom exception for Vllm-related errors."""
 
     def __init__(self, status_code: int, message: str):
-        """Initialize a VLLMError with a status code and message."""
+        """Initialize a VllmError with a status code and message."""
         self.status_code = status_code
         self.message = message
         super().__init__(self.message)

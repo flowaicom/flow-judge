@@ -1,6 +1,6 @@
 from .common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel, ModelConfig, ModelType
 from .huggingface import Hf
-from .vllm import Vllm, VLLMError
+from .vllm import Vllm, VllmError
 from .llamafile import Llamafile, LlamafileError
 
 __all__ = [
@@ -8,7 +8,7 @@ __all__ = [
     "BaseFlowJudgeModel",
     "Hf",
     "Vllm",
-    "VLLMError",
+    "VllmError",
     "ModelType",
     "ModelConfig",
     "Llamafile",

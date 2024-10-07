@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any
+from typing import Any, Dict, Optional
 
 import torch
 from huggingface_hub import snapshot_download
@@ -11,46 +11,47 @@ from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType
 
 logger = logging.getLogger(__name__)
 
-_HfConfig = ModelConfig(
-    model_id="flowaicom/Flow-Judge-v0.1",
-    model_type=ModelType.TRANSFORMERS,
-    generation_params={
-        "temperature": 0.1,
-        "top_p": 0.95,
-        "max_new_tokens": 1000,
-        "do_sample": True,
-    },
-    device_map="auto",
-    torch_dtype="bfloat16",
-    attn_implementation="flash_attention_2",
-)
-
-_HfNoFlashAttnConfig = ModelConfig(
-    model_id="flowaicom/Flow-Judge-v0.1",
-    model_type=ModelType.TRANSFORMERS,
-    generation_params={
-        "temperature": 0.1,
-        "top_p": 0.95,
-        "max_new_tokens": 1000,
-        "do_sample": True,
-    },
-    device_map="auto",
-    torch_dtype="bfloat16",
-)
+class HfConfig(ModelConfig):
+    def __init__(
+        self,
+        model_id: str,
+        generation_params: Dict[str, Any],
+        device_map: str = "auto",
+        torch_dtype: str = "bfloat16",
+        attn_implementation: Optional[str] = None,
+        flash_attn: bool = True,
+        **kwargs: Any
+    ):
+        super().__init__(model_id, ModelType.TRANSFORMERS, generation_params, **kwargs)
+        self.device_map = device_map
+        self.torch_dtype = torch_dtype
+        self.attn_implementation = attn_implementation if flash_attn else None
+        self.flash_attn = flash_attn
 
 class Hf(BaseFlowJudgeModel):
     """FlowJudge model class for Hugging Face Transformers."""
 
     def __init__(self, model_id: str = None, generation_params: dict[str, Any] = None, flash_attn: bool = True, **kwargs: Any):
         """Initialize the FlowJudge Hugging Face Transformers model."""
-        if flash_attn:
-            config = _HfConfig
-        else:
-            config = _HfNoFlashAttnConfig
+        default_model_id = "flowaicom/Flow-Judge-v0.1"
+        model_id = model_id or default_model_id
 
-        model = model or config.model_id
-        generation_params = generation_params or config.generation_params
-        kwargs = {**config.hf_kwargs, **kwargs}
+        default_generation_params = {
+            "temperature": 0.1,
+            "top_p": 0.95,
+            "max_new_tokens": 1000,
+            "do_sample": True,
+        }
+        generation_params = generation_params or default_generation_params
+
+        config = HfConfig(
+            model_id=model_id,
+            generation_params=generation_params,
+            flash_attn=flash_attn,
+            attn_implementation="flash_attention_2" if flash_attn else None,
+            **kwargs
+        )
+
         super().__init__(model_id, "transformers", generation_params, **kwargs)
 
         os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
@@ -61,8 +62,15 @@ class Hf(BaseFlowJudgeModel):
         )
         snapshot_download(repo_id=model_id)
 
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, **config.hf_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, **config.hf_kwargs)
+        model_kwargs = {
+            "device_map": config.device_map,
+            "torch_dtype": getattr(torch, config.torch_dtype),
+        }
+        if config.attn_implementation:
+            model_kwargs["attn_implementation"] = config.attn_implementation
+
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.generation_params = generation_params
 

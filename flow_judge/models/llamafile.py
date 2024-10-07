@@ -5,7 +5,7 @@ import shlex
 import subprocess
 import threading
 import time
-from typing import Any, List
+from typing import Any, Dict, List
 
 import requests
 from openai import AsyncOpenAI, OpenAI
@@ -22,82 +22,91 @@ LLAMAFILE_URL = (
 class DownloadError(Exception):
     pass
 
-_LlamafileConfig = ModelConfig(
-    model_id="sariola/flow-judge-llamafile",
-    model_type=ModelType.LLAMAFILE,
-    generation_params={
-        "temperature": 0.1,
-        "top_p": 0.95,
-        "max_tokens": 2000,
-        "context_size": 16384,
-        "gpu_layers": 34,
-        "thread_count": 32,
-        "batch_size": 32,
-        "max_concurrent_requests": 1,
-        "stop": ["<|endoftext|>"]
-    },
-    model_filename="flow-judge.llamafile",
-    cache_dir=os.path.expanduser("~/.cache/flow-judge"),
-    port=8085,
-    disable_kv_offload=False,
-    llamafile_kvargs="",
-)
+class LlamafileConfig(ModelConfig):
+    def __init__(
+        self,
+        model_id: str,
+        generation_params: Dict[str, Any],
+        model_filename: str = "flow-judge.llamafile",
+        cache_dir: str = "~/.cache/flow-judge",
+        port: int = 8085,
+        disable_kv_offload: bool = False,
+        llamafile_kvargs: str = "",
+        **kwargs: Any
+    ):
+        super().__init__(model_id, ModelType.LLAMAFILE, generation_params, **kwargs)
+        self.model_filename = model_filename
+        self.cache_dir = cache_dir
+        self.port = port
+        self.disable_kv_offload = disable_kv_offload
+        self.llamafile_kvargs = llamafile_kvargs
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
-    def __init__(self, model: str = None, generation_params: dict[str, Any] = None, **kwargs: Any):
-        try:
-            # Use LlamafileConfig as the default configuration
-            config = _LlamafileConfig
+    def __init__(
+        self,
+        model: str = None,
+        generation_params: dict[str, Any] = None,
+        cache_dir: str = "~/.cache/flow-judge",
+        port: int = 8085,
+        disable_kv_offload: bool = False,
+        llamafile_kvargs: str = "",
+        **kwargs: Any
+    ):
+        default_model_id = "sariola/flow-judge-llamafile"
+        model = model or default_model_id
 
-            # Override with provided parameters if any
-            model = model or config.model_id
-            generation_params = generation_params or config.generation_params
-            kwargs = {**config.llamafile_kwargs, **kwargs}
+        default_generation_params = {
+            "temperature": 0.1,
+            "top_p": 0.95,
+            "max_tokens": 2000,
+            "context_size": 16384,
+            "gpu_layers": 34,
+            "thread_count": 32,
+            "batch_size": 32,
+            "max_concurrent_requests": 1,
+            "stop": ["<|endoftext|>"]
+        }
+        generation_params = generation_params or default_generation_params
 
-            super().__init__(model, "llamafile", generation_params, **kwargs)
+        config = LlamafileConfig(
+            model_id=model,
+            generation_params=generation_params,
+            model_filename="flow-judge.llamafile",
+            cache_dir=cache_dir,
+            port=port,
+            disable_kv_offload=disable_kv_offload,
+            llamafile_kvargs=llamafile_kvargs,
+            **kwargs
+        )
 
-            self.generation_params = generation_params
-            self.cache_dir = kwargs.get("cache_dir", config.llamafile_kwargs["cache_dir"])
-            self.model_repo = kwargs.get("model_repo", config.model_id.split("/")[0])
-            self.model_filename = kwargs.get(
-                "model_filename", config.llamafile_kwargs["model_filename"]
-            )
-            self.port = kwargs.get("port", config.llamafile_kwargs["port"])
-            self.llamafile_process = None
+        super().__init__(model, "llamafile", generation_params, **kwargs)
 
-            # Allow overriding of sync and async clients
-            self.sync_client = kwargs.get("sync_client") or OpenAI(
-                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-            )
-            self.async_client = kwargs.get("async_client") or AsyncOpenAI(
-                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-            )
+        self.generation_params = generation_params
+        self.cache_dir = config.cache_dir
+        self.model_repo = config.model_id.split("/")[0]
+        self.model_filename = config.model_filename
+        self.port = config.port
+        self.llamafile_process = None
 
-            self.timeout = kwargs.get(
-                "timeout", 30
-            )  # You might want to add this to LlamafileConfig if it's configurable
-            self._server_running = False
-            self._context_depth = 0
+        self.sync_client = kwargs.get("sync_client") or OpenAI(
+            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+        )
+        self.async_client = kwargs.get("async_client") or AsyncOpenAI(
+            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+        )
 
-            # Additional parameters from LlamafileConfig
-            self.disable_kv_offload = kwargs.get(
-                "disable_kv_offload", config.llamafile_kwargs["disable_kv_offload"]
-            )
-            self.llamafile_kvargs = kwargs.get(
-                "llamafile_kvargs", config.llamafile_kwargs["llamafile_kvargs"]
-            )
+        self.timeout = kwargs.get("timeout", 30)
+        self._server_running = False
+        self._context_depth = 0
 
-            self.metadata = {
-                "model_id": model,
-                "model_type": "llamafile",
-                # ... other metadata ...
-            }
+        self.disable_kv_offload = config.disable_kv_offload
+        self.llamafile_kvargs = config.llamafile_kvargs
 
-        except ImportError as e:
-            raise LlamafileError(
-                status_code=1,
-                message="Failed to import 'openai' package. Make sure it is installed correctly.",
-            ) from e
+        self.metadata = {
+            "model_id": model,
+            "model_type": "llamafile",
+            # ... other metadata ...
+        }
 
     def is_server_running(self):
         try:

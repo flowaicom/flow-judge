@@ -111,7 +111,7 @@ class HaystackFlowJudge:
         )
 
         results: list[dict[str, Any] | None] = []
-        errors = 0
+        parsing_errors = 0
         for eval_output in eval_outputs:
             if eval_output.score != -1:
                 result = {
@@ -121,17 +121,21 @@ class HaystackFlowJudge:
 
                 results.append(result)
             else:
-                results.append(None)
-                errors += 1
+                results.append({"feedback": eval_output.feedback, "score": eval_output.score})
+                parsing_errors += 1
 
-        if errors > 0:
-            msg = f"FlowJudge failed to parse {errors} results."
+        if parsing_errors > 0:
+            msg = (
+                f"FlowJudge failed to parse {parsing_errors} results out "
+                f"of {len(eval_outputs)}. Score and Individual Scores are "
+                "based on the successfully parsed results."
+            )
             logger.warning(msg)
 
         metadata = self.model.metadata
 
-        score = np.mean([result["score"] for result in results])
-        individual_scores = [float(result["score"]) for result in results]
+        score = np.mean([result["score"] for result in results if result["score"] != -1])
+        individual_scores = [float(result["score"]) for result in results if result["score"] != -1]
 
         return {
             "results": results,

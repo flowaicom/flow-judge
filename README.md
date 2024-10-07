@@ -3,9 +3,20 @@
 <p align="center">
   <img src="img/flow_judge_banner.png" alt="Flow Judge Banner">
 </p>
-<p align="center">
-    <em>A small yet powerful LM Judge for evaluating LLM applications</em>
+
+<p align="center" style="font-family: 'Courier New', Courier, monospace;">
+  <strong>
+    <a href="https://www.flow-ai.com/judge">Technical Report</a> |
+    <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
+    <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
+    <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Examples</a>
+  </strong>
 </p>
+
+<p align="center" style="font-family: 'Courier New', Courier, monospace;">
+  <code>flow-judge</code> is a lightweight library for evaluating LLM applications with <code>Flow-Judge-v0.1</code>.
+</p>
+
 <p align="center">
 <a href="https://github.com/flowaicom/flow-judge/stargazers/" target="_blank">
     <img src="https://img.shields.io/github/stars/flowaicom/flow-judge?style=social&label=Star&maxAge=2592000" alt="GitHub stars">
@@ -25,19 +36,6 @@
 <a href="https://github.com/flowaicom/flow-judge/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/static/v1?label=license&message=Apache%202.0&color=white" alt="License">
 </a>
-</p>
-
-<p align="center" style="font-family: 'Courier New', Courier, monospace;">
-  <strong>
-    <a href="https://www.flow-ai.com/judge">Technical Report</a> |
-    <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
-    <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
-    <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Examples</a>
-  </strong>
-</p>
-
-<p align="center" style="font-family: 'Courier New', Courier, monospace;">
-  <code>flow-judge</code> is a lightweight library for evaluating LLM applications with <code>Flow-Judge-v0.1</code>.
 </p>
 
 ## Model

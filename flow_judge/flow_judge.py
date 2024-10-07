@@ -3,7 +3,7 @@ import logging
 
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.metrics import CustomMetric, Metric
-from flow_judge.models.base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
+from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from flow_judge.utils.prompt_formatter import format_rubric, format_user_prompt, format_vars
 from flow_judge.utils.result_writer import write_results_to_disk
 from flow_judge.utils.validators import validate_eval_input
@@ -73,7 +73,7 @@ class FlowJudge(BaseFlowJudge):
         try:
             self._validate_inputs(eval_input)
             prompt = self._format_prompt(eval_input)
-            response = self.model.generate(prompt)
+            response = self.model._generate(prompt)
             eval_output = EvalOutput.parse(response)
             if save_results:
                 self._save_results([eval_input], [eval_output])
@@ -92,7 +92,7 @@ class FlowJudge(BaseFlowJudge):
         """Batch evaluate a list of EvalInput objects."""
         self._validate_inputs(eval_inputs)
         prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
-        responses = self.model.batch_generate(prompts, use_tqdm=use_tqdm)
+        responses = self.model._batch_generate(prompts, use_tqdm=use_tqdm)
         eval_outputs = [
             EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
             for response in responses

@@ -11,9 +11,7 @@ import requests
 from openai import AsyncOpenAI, OpenAI
 from tqdm import tqdm
 
-from flow_judge.models.base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.models.model_configs import LlamafileConfig, ModelConfig
-from flow_judge.models.model_types import ModelType
+from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel, ModelConfig, ModelType
 
 
 LLAMAFILE_URL = (
@@ -252,7 +250,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             self.llamafile_process.kill()
             self.llamafile_process = None
 
-    def generate(self, prompt: str) -> str:
+    def _generate(self, prompt: str) -> str:
         self._ensure_server_running()
         response = self.sync_client.chat.completions.create(
             model="flow-judge",
@@ -278,7 +276,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             "stop": self.generation_params.get("stop", ["<|endoftext|>"]),
         }
 
-    def batch_generate(self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any) -> List[str]:
+    def _batch_generate(self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any) -> List[str]:
         self._ensure_server_running()
         return [self.generate(prompt) for prompt in prompts]
 

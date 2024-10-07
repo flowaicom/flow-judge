@@ -7,7 +7,7 @@ from haystack.utils import deserialize_type
 
 from flow_judge.flow_judge import EvalInput, EvalOutput, FlowJudge
 from flow_judge.metrics.metric import CustomMetric, Metric
-from flow_judge.models.base import BaseFlowJudgeModel
+from flow_judge.models.common import BaseFlowJudgeModel
 
 logger = logging.getLogger(__name__)
 

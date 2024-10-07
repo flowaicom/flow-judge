@@ -4,9 +4,9 @@ import torch
 from transformers import AutoTokenizer
 from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
 
-from flow_judge.models.base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.models.model_configs import ModelConfig, VllmConfig, VllmAwqConfig, VllmAwqAsyncConfig
-from flow_judge.models.model_types import ModelType
+from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
+from flow_judge.models.model_configs import ModelConfig
+from flow_judge.models.common import ModelType
 
 _VllmConfig = ModelConfig(
     model_id="flowaicom/Flow-Judge-v0.1",
@@ -90,7 +90,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 message="Failed to import 'vllm' package. Make sure it is installed correctly.",
             ) from e
 
-    def generate(self, prompt: str) -> str:
+    def _generate(self, prompt: str) -> str:
         """Generate a response using the FlowJudge vLLM model."""
         if self.exec_async:
             return asyncio.run(self._async_generate(prompt))
@@ -100,7 +100,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         outputs = self.model.chat(conversation, sampling_params=params)
         return outputs[0].outputs[0].text.strip()
 
-    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    def _batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
         """Generate responses for multiple prompts using the FlowJudge vLLM model."""
         if self.exec_async:
             return asyncio.run(self._async_batch_generate(prompts, use_tqdm, **kwargs))

@@ -7,9 +7,7 @@ from huggingface_hub import snapshot_download
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from flow_judge.models.base import BaseFlowJudgeModel
-from flow_judge.models.model_configs import HfConfig, HfNoFlashAttnConfig, ModelConfig
-from flow_judge.models.model_types import ModelType
+from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +122,7 @@ class Hf(BaseFlowJudgeModel):
                 else:
                     raise
 
-    def generate(self, prompt: str) -> str:
+    def _generate(self, prompt: str) -> str:
         """Generate a response using the FlowJudge Hugging Face Transformers model."""
         chat_prompt = self.tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True
@@ -138,7 +136,7 @@ class Hf(BaseFlowJudgeModel):
         generated_text = self.tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
         return generated_text.strip()
 
-    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    def _batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
         """Generate responses for multiple prompts using batching."""
         all_results = []
 

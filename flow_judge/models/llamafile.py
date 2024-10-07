@@ -12,7 +12,8 @@ from openai import AsyncOpenAI, OpenAI
 from tqdm import tqdm
 
 from flow_judge.models.base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.models.model_configs import ModelConfig, LlamafileConfig
+from flow_judge.models.model_configs import LlamafileConfig, ModelConfig
+from flow_judge.models.model_types import ModelType
 
 
 LLAMAFILE_URL = (
@@ -23,63 +24,82 @@ LLAMAFILE_URL = (
 class DownloadError(Exception):
     pass
 
+_LlamafileConfig = ModelConfig(
+    model_id="sariola/flow-judge-llamafile",
+    model_type=ModelType.LLAMAFILE,
+    generation_params={
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "max_tokens": 2000,
+        "context_size": 16384,
+        "gpu_layers": 34,
+        "thread_count": 32,
+        "batch_size": 32,
+        "max_concurrent_requests": 1,
+        "stop": ["<|endoftext|>"]
+    },
+    model_filename="flow-judge.llamafile",
+    cache_dir=os.path.expanduser("~/.cache/flow-judge"),
+    port=8085,
+    disable_kv_offload=False,
+    llamafile_kvargs="",
+)
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     def __init__(self, model: str = None, generation_params: dict[str, Any] = None, **kwargs: Any):
-        # Use LlamafileConfig as the default configuration
-        config = LlamafileConfig
+        try:
+            # Use LlamafileConfig as the default configuration
+            config = _LlamafileConfig
 
-        # Override with provided parameters if any
-        model = model or config.model_id
-        generation_params = generation_params or config.generation_params
-        kwargs = {**config.llamafile_kwargs, **kwargs}
+            # Override with provided parameters if any
+            model = model or config.model_id
+            generation_params = generation_params or config.generation_params
+            kwargs = {**config.llamafile_kwargs, **kwargs}
 
-        super().__init__(model, model, generation_params, **kwargs)
+            super().__init__(model, "llamafile", generation_params, **kwargs)
 
-        self.generation_params = generation_params
-        self.cache_dir = kwargs.get("cache_dir", config.llamafile_kwargs["cache_dir"])
-        self.model_repo = kwargs.get("model_repo", config.model_id.split("/")[0])
-        self.model_filename = kwargs.get(
-            "model_filename", config.llamafile_kwargs["model_filename"]
-        )
-        self.port = kwargs.get("port", config.llamafile_kwargs["port"])
-        self.llamafile_process = None
+            self.generation_params = generation_params
+            self.cache_dir = kwargs.get("cache_dir", config.llamafile_kwargs["cache_dir"])
+            self.model_repo = kwargs.get("model_repo", config.model_id.split("/")[0])
+            self.model_filename = kwargs.get(
+                "model_filename", config.llamafile_kwargs["model_filename"]
+            )
+            self.port = kwargs.get("port", config.llamafile_kwargs["port"])
+            self.llamafile_process = None
 
-        # Allow overriding of sync and async clients
-        self.sync_client = kwargs.get("sync_client") or OpenAI(
-            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-        )
-        self.async_client = kwargs.get("async_client") or AsyncOpenAI(
-            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-        )
+            # Allow overriding of sync and async clients
+            self.sync_client = kwargs.get("sync_client") or OpenAI(
+                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+            )
+            self.async_client = kwargs.get("async_client") or AsyncOpenAI(
+                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+            )
 
-        self.timeout = kwargs.get(
-            "timeout", 30
-        )  # You might want to add this to LlamafileConfig if it's configurable
-        self._server_running = False
-        self._context_depth = 0
+            self.timeout = kwargs.get(
+                "timeout", 30
+            )  # You might want to add this to LlamafileConfig if it's configurable
+            self._server_running = False
+            self._context_depth = 0
 
-        # Additional parameters from LlamafileConfig
-        self.disable_kv_offload = kwargs.get(
-            "disable_kv_offload", config.llamafile_kwargs["disable_kv_offload"]
-        )
-        self.llamafile_kvargs = kwargs.get(
-            "llamafile_kvargs", config.llamafile_kwargs["llamafile_kvargs"]
-        )
+            # Additional parameters from LlamafileConfig
+            self.disable_kv_offload = kwargs.get(
+                "disable_kv_offload", config.llamafile_kwargs["disable_kv_offload"]
+            )
+            self.llamafile_kvargs = kwargs.get(
+                "llamafile_kvargs", config.llamafile_kwargs["llamafile_kvargs"]
+            )
 
-        self.metadata = {
-            "model_id": model,
-            "model_type": "llamafile",
-            # ... other metadata ...
-        }
+            self.metadata = {
+                "model_id": model,
+                "model_type": "llamafile",
+                # ... other metadata ...
+            }
 
-    @classmethod
-    def from_config(cls, config: "ModelConfig"):
-        return cls(
-            model=config.model_id,
-            generation_params=config.generation_params,
-            **config.llamafile_kwargs,
-        )
+        except ImportError as e:
+            raise LlamafileError(
+                status_code=1,
+                message="Failed to import 'openai' package. Make sure it is installed correctly.",
+            ) from e
 
     def is_server_running(self):
         try:

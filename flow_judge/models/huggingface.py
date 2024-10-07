@@ -8,16 +8,52 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from flow_judge.models.base import BaseFlowJudgeModel
+from flow_judge.models.model_configs import HfConfig, HfNoFlashAttnConfig, ModelConfig
+from flow_judge.models.model_types import ModelType
 
 logger = logging.getLogger(__name__)
 
+_HfConfig = ModelConfig(
+    model_id="flowaicom/Flow-Judge-v0.1",
+    model_type=ModelType.TRANSFORMERS,
+    generation_params={
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "max_new_tokens": 1000,
+        "do_sample": True,
+    },
+    device_map="auto",
+    torch_dtype="bfloat16",
+    attn_implementation="flash_attention_2",
+)
 
-class FlowJudgeHFModel(BaseFlowJudgeModel):
+_HfNoFlashAttnConfig = ModelConfig(
+    model_id="flowaicom/Flow-Judge-v0.1",
+    model_type=ModelType.TRANSFORMERS,
+    generation_params={
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "max_new_tokens": 1000,
+        "do_sample": True,
+    },
+    device_map="auto",
+    torch_dtype="bfloat16",
+)
+
+class Hf(BaseFlowJudgeModel):
     """FlowJudge model class for Hugging Face Transformers."""
 
-    def __init__(self, model_id: str, generation_params: dict[str, Any], **hf_kwargs: Any):
+    def __init__(self, model_id: str = None, generation_params: dict[str, Any] = None, flash_attn: bool = True, **kwargs: Any):
         """Initialize the FlowJudge Hugging Face Transformers model."""
-        super().__init__(model_id, "transformers", generation_params, **hf_kwargs)
+        if flash_attn:
+            config = _HfConfig
+        else:
+            config = _HfNoFlashAttnConfig
+
+        model = model or config.model_id
+        generation_params = generation_params or config.generation_params
+        kwargs = {**config.hf_kwargs, **kwargs}
+        super().__init__(model_id, "transformers", generation_params, **kwargs)
 
         os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
@@ -27,8 +63,8 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
         )
         snapshot_download(repo_id=model_id)
 
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, **hf_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, **hf_kwargs)
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, **config.hf_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, **config.hf_kwargs)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.generation_params = generation_params
 

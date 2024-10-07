@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/release/flowaicom/flow-judge?color=white" alt="Release">
 </a>
 <a href="https://www.youtube.com/@flowaicom" target="_blank">
-    <img alt="YouTube Channel Views" src="https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social">
+    <img alt="YouTube Channel Views" src="https://img.shields.io/youtube/channel/views/UCo2qL1nIQRHiPc0TF9xbqwg?style=social">
 </a>
 <a href="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml" target="_blank">
     <img src="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml/badge.svg" alt="Build">

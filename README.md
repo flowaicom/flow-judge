@@ -20,7 +20,7 @@
     <img src="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml/badge.svg" alt="Build">
 </a>
 <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
-    <img src="https://codecov.io/gh/flowaicom/flow-judge/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
+    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/feat%2Fllamafile/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
 </a>
 <a href="https://github.com/flowaicom/flow-judge" target="_blank">
     <img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue" alt="Python versions">

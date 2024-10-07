@@ -22,9 +22,6 @@
 <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
     <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/feat%2Fllamafile/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
 </a>
-<a href="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml" target="_blank">
-    <img src="https://img.shields.io/github/actions/workflow/status/flowaicom/flow-judge/python-package.yml?label=Python%203.10%20%7C%203.11%20%7C%203.12" alt="Python versions">
-</a>
 <a href="https://github.com/flowaicom/flow-judge/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/static/v1?label=license&message=Apache%202.0&color=white" alt="License">
 </a>

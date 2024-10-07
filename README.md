@@ -27,8 +27,6 @@
 </a>
 </p>
 
-# `flow-judge`
-
 <p align="center" style="font-family: 'Courier New', Courier, monospace;">
   <strong>
     <a href="https://www.flow-ai.com/judge">Technical Report</a> |

@@ -20,7 +20,10 @@ class LlamaIndexFlowJudge(BaseEvaluator):
     """
 
     def __init__(
-        self, metric: Metric | CustomMetric, model: AsyncBaseFlowJudgeModel, output_dir: str = "output/"
+        self,
+        metric: Metric | CustomMetric,
+        model: AsyncBaseFlowJudgeModel,
+        output_dir: str = "output/",
     ):
         """Initialize the LlamaIndexFlowJudge."""
         if isinstance(metric, (Metric, CustomMetric)):

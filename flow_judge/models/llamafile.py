@@ -10,10 +10,16 @@ from typing import Any, Dict, List
 import requests
 from tqdm import tqdm
 
-from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel, ModelConfig, ModelType
+from flow_judge.models.common import (
+    AsyncBaseFlowJudgeModel,
+    BaseFlowJudgeModel,
+    ModelConfig,
+    ModelType,
+)
 
 try:
     from openai import AsyncOpenAI, OpenAI
+
     LLAMAFILE_AVAILABLE = True
 except ImportError:
     LLAMAFILE_AVAILABLE = False
@@ -23,6 +29,7 @@ LLAMAFILE_URL = (
 )
 
 logger = logging.getLogger(__name__)
+
 
 class LlamafileConfig(ModelConfig):
     def __init__(
@@ -34,7 +41,7 @@ class LlamafileConfig(ModelConfig):
         port: int = 8085,
         disable_kv_offload: bool = False,
         llamafile_kvargs: str = "",
-        **kwargs: Any
+        **kwargs: Any,
     ):
         super().__init__(model_id, ModelType.LLAMAFILE, generation_params, **kwargs)
         self.model_filename = model_filename
@@ -42,6 +49,7 @@ class LlamafileConfig(ModelConfig):
         self.port = port
         self.disable_kv_offload = disable_kv_offload
         self.llamafile_kvargs = llamafile_kvargs
+
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for Llamafile supporting both sync and async operations."""
@@ -54,15 +62,15 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         port: int = 8085,
         disable_kv_offload: bool = False,
         llamafile_kvargs: str = "",
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize the FlowJudge Llamafile model."""
         if not LLAMAFILE_AVAILABLE:
             raise LlamafileError(
                 status_code=1,
                 message="The required Llamafile packages are not installed. "
-                        "Please install them by adding 'llamafile' to your extras:\n"
-                        "pip install flow-judge[...,llamafile]"
+                "Please install them by adding 'llamafile' to your extras:\n"
+                "pip install flow-judge[...,llamafile]",
             )
 
         default_model_id = "sariola/flow-judge-llamafile"
@@ -75,9 +83,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             "context_size": 8192,
             "gpu_layers": 34,
             "thread_count": os.cpu_count() or 1,
-            "batch_size": 32, # here batch doesn't mean parallel requests, it's just the batch size for the llamafile server
+            "batch_size": 32,  # here batch doesn't mean parallel requests, it's just the batch size for the llamafile server
             "max_concurrent_requests": 1,
-            "stop": ["<|endoftext|>"]
+            "stop": ["<|endoftext|>"],
         }
         generation_params = generation_params or default_generation_params
 
@@ -89,7 +97,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             port=port,
             disable_kv_offload=disable_kv_offload,
             llamafile_kvargs=llamafile_kvargs,
-            **kwargs
+            **kwargs,
         )
 
         super().__init__(model, "llamafile", generation_params, **kwargs)
@@ -125,8 +133,8 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             raise LlamafileError(
                 status_code=2,
                 message=f"An error occurred while initializing the Llamafile model: {str(e)}\n"
-                        "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
-                        "pip install flow-judge[...,llamafile]"
+                "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
+                "pip install flow-judge[...,llamafile]",
             ) from e
 
     def is_server_running(self):
@@ -306,7 +314,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             "stop": self.generation_params.get("stop", ["<|endoftext|>"]),
         }
 
-    def _batch_generate(self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any) -> List[str]:
+    def _batch_generate(
+        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> List[str]:
         self._ensure_server_running()
         return [self._generate(prompt) for prompt in prompts]
 

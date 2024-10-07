@@ -12,6 +12,7 @@ class EvalInput(BaseModel):
     inputs: list[dict[str, str]] = Field(default_factory=list)
     output: dict[str, str]
 
+
 class EvalOutput(BaseModel):
     """Output model for evaluation results."""
 

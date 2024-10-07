@@ -1,18 +1,23 @@
+import asyncio
 from typing import Any, Dict
 
 import torch
 from transformers import AutoTokenizer
 
-from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.models.common import ModelType, ModelConfig
-
-import asyncio
+from flow_judge.models.common import (
+    AsyncBaseFlowJudgeModel,
+    BaseFlowJudgeModel,
+    ModelConfig,
+    ModelType,
+)
 
 try:
     from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
+
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False
+
 
 class VllmConfig(ModelConfig):
     def __init__(
@@ -28,7 +33,7 @@ class VllmConfig(ModelConfig):
         max_num_seqs: int = 256,
         quantization: bool = True,
         exec_async: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         model_type = ModelType.VLLM_ASYNC if exec_async else ModelType.VLLM
         super().__init__(model_id, model_type, generation_params, **kwargs)
@@ -46,25 +51,27 @@ class VllmConfig(ModelConfig):
 class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for vLLM supporting both sync and async operations."""
 
-    def __init__(self, model: str = None, generation_params: dict[str, Any] = None, quantized: bool = True, exec_async: bool = False, **kwargs: Any):
+    def __init__(
+        self,
+        model: str = None,
+        generation_params: dict[str, Any] = None,
+        quantized: bool = True,
+        exec_async: bool = False,
+        **kwargs: Any,
+    ):
         """Initialize the FlowJudge vLLM model."""
         if not VLLM_AVAILABLE:
             raise VllmError(
                 status_code=1,
                 message="The 'vllm' package is not installed. Please install it by adding 'vllm' to your extras:\n"
-                        "pip install flow-judge[...,vllm]"
+                "pip install flow-judge[...,vllm]",
             )
 
         base_model_id = "flowaicom/Flow-Judge-v0.1"
         model_id = f"{base_model_id}-AWQ" if quantized else base_model_id
         model = model or model_id
 
-        config = VllmConfig(
-            model_id=model,
-            quantization=quantized,
-            exec_async=exec_async,
-            **kwargs
-        )
+        config = VllmConfig(model_id=model, quantization=quantized, exec_async=exec_async, **kwargs)
 
         generation_params = generation_params or config.generation_params
 
@@ -93,7 +100,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "gpu_memory_utilization": config.gpu_memory_utilization,
                 "max_num_seqs": config.max_num_seqs,
                 "quantization": "awq_marlin" if config.quantization else None,
-                **kwargs
+                **kwargs,
             }
 
             if exec_async:
@@ -119,7 +126,9 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         outputs = self.model.chat(conversation, sampling_params=params)
         return outputs[0].outputs[0].text.strip()
 
-    def _batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    def _batch_generate(
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         """Generate responses for multiple prompts using the FlowJudge vLLM model."""
         if self.exec_async:
             return asyncio.run(self._async_batch_generate(prompts, use_tqdm, **kwargs))
@@ -138,17 +147,23 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     async def _async_generate(self, prompt: str) -> str:
         """Internal method for async generation."""
         conversation = [{"role": "user", "content": prompt.strip()}]
-        prompt = self.tokenizer.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
+        prompt = self.tokenizer.apply_chat_template(
+            conversation, add_generation_prompt=True, tokenize=False
+        )
         params = SamplingParams(**self.generation_params)
         request_id = f"req_{id(prompt)}"
 
-        async for output in self.engine.generate(inputs=prompt, sampling_params=params, request_id=request_id):
+        async for output in self.engine.generate(
+            inputs=prompt, sampling_params=params, request_id=request_id
+        ):
             if output.finished:
                 return output.outputs[0].text.strip()
 
         return ""
 
-    async def _async_batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    async def _async_batch_generate(
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         """Internal method for async batch generation."""
         conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
         formatted_prompts = [
@@ -178,6 +193,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         """Shut down the background loop (async only)."""
         if self.exec_async:
             self.engine.shutdown_background_loop()
+
 
 class VllmError(Exception):
     """Custom exception for Vllm-related errors."""

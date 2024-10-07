@@ -23,7 +23,9 @@ class BaseFlowJudgeModel(ABC):
         pass
 
     @abstractmethod
-    def _batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    def _batch_generate(
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         """Generate responses for multiple prompts."""
         pass
 
@@ -69,6 +71,7 @@ class Engine(Enum):
     VLLM_ASYNC = "vllm_async"
     HF = "hf"  # HF stands for Hugging Face (Transformers)
     LLAMAFILE = "llamafile"
+
 
 class ModelConfig:
     """Base configuration for a model."""

@@ -33,6 +33,11 @@ jobs:
     - name: Sort imports with isort
       run: |
         isort --check-only --diff . || true
-    - name: Test with pytest
+    - name: Test with pytest and generate coverage
       run: |
-        pytest
+        pytest --cov=./ --cov-report=xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true

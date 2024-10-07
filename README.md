@@ -1,7 +1,36 @@
 # `flow-judge`
+
 <p align="center">
   <img src="img/flow_judge_banner.png" alt="Flow Judge Banner">
 </p>
+<p align="center">
+    <em>A small yet powerful LM Judge for evaluating LLM applications</em>
+</p>
+<p align="center">
+<a href="https://github.com/flowaicom/flow-judge/stargazers/" target="_blank">
+    <img src="https://img.shields.io/github/stars/flowaicom/flow-judge?style=social&label=Star&maxAge=2592000" alt="GitHub stars">
+</a>
+<a href="https://github.com/flowaicom/flow-judge/releases" target="_blank">
+    <img src="https://img.shields.io/github/v/release/flowaicom/flow-judge?color=white" alt="Release">
+</a>
+<a href="https://www.youtube.com/@flowaicom" target="_blank">
+    <img alt="YouTube Channel Views" src="https://img.shields.io/youtube/channel/views/UCQ_JWEFzs1_INqdhIO3kmrw?style=social">
+</a>
+<a href="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml" target="_blank">
+    <img src="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml/badge.svg" alt="Build">
+</a>
+<a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
+    <img src="https://codecov.io/gh/flowaicom/flow-judge/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
+</a>
+<a href="https://github.com/flowaicom/flow-judge" target="_blank">
+    <img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue" alt="Python versions">
+</a>
+<a href="https://github.com/flowaicom/flow-judge/blob/main/LICENSE" target="_blank">
+    <img src="https://img.shields.io/static/v1?label=license&message=Apache%202.0&color=white" alt="License">
+</a>
+</p>
+
+# `flow-judge`
 
 <p align="center" style="font-family: 'Courier New', Courier, monospace;">
   <strong>

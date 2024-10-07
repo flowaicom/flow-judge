@@ -37,6 +37,8 @@ dev = [
     "ruff",
     "black",
     "isort",
+    "pytest-cov",
+    "codecov",
 ]
 hf = [
     "transformers>=4.45.0",

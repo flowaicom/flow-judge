@@ -2,12 +2,17 @@ from typing import Any, Dict
 
 import torch
 from transformers import AutoTokenizer
-from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
 
 from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from flow_judge.models.common import ModelType, ModelConfig
 
 import asyncio
+
+try:
+    from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
 
 class VllmConfig(ModelConfig):
     def __init__(
@@ -43,6 +48,13 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(self, model: str = None, generation_params: dict[str, Any] = None, quantized: bool = True, exec_async: bool = False, **kwargs: Any):
         """Initialize the FlowJudge vLLM model."""
+        if not VLLM_AVAILABLE:
+            raise VllmError(
+                status_code=1,
+                message="The 'vllm' package is not installed. Please install it by adding 'vllm' to your extras:\n"
+                        "pip install flow-judge[...,vllm]"
+            )
+
         base_model_id = "flowaicom/Flow-Judge-v0.1"
         model_id = f"{base_model_id}-AWQ" if quantized else base_model_id
         model = model or model_id

@@ -8,19 +8,21 @@ import time
 from typing import Any, Dict, List
 
 import requests
-from openai import AsyncOpenAI, OpenAI
 from tqdm import tqdm
 
 from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel, ModelConfig, ModelType
 
+try:
+    from openai import AsyncOpenAI, OpenAI
+    LLAMAFILE_AVAILABLE = True
+except ImportError:
+    LLAMAFILE_AVAILABLE = False
 
 LLAMAFILE_URL = (
     "https://huggingface.co/sariola/flow-judge-llamafile/resolve/main/flow-judge.llamafile"
 )
 
-
-class DownloadError(Exception):
-    pass
+logger = logging.getLogger(__name__)
 
 class LlamafileConfig(ModelConfig):
     def __init__(
@@ -42,6 +44,8 @@ class LlamafileConfig(ModelConfig):
         self.llamafile_kvargs = llamafile_kvargs
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
+    """Combined FlowJudge model class for Llamafile supporting both sync and async operations."""
+
     def __init__(
         self,
         model: str = None,
@@ -52,6 +56,15 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         llamafile_kvargs: str = "",
         **kwargs: Any
     ):
+        """Initialize the FlowJudge Llamafile model."""
+        if not LLAMAFILE_AVAILABLE:
+            raise LlamafileError(
+                status_code=1,
+                message="The required Llamafile packages are not installed. "
+                        "Please install them by adding 'llamafile' to your extras:\n"
+                        "pip install flow-judge[...,llamafile]"
+            )
+
         default_model_id = "sariola/flow-judge-llamafile"
         model = model or default_model_id
 
@@ -81,31 +94,40 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         super().__init__(model, "llamafile", generation_params, **kwargs)
 
-        self.generation_params = generation_params
-        self.cache_dir = config.cache_dir
-        self.model_repo = config.model_id.split("/")[0]
-        self.model_filename = config.model_filename
-        self.port = config.port
-        self.llamafile_process = None
+        try:
+            self.generation_params = generation_params
+            self.cache_dir = config.cache_dir
+            self.model_repo = config.model_id.split("/")[0]
+            self.model_filename = config.model_filename
+            self.port = config.port
+            self.llamafile_process = None
 
-        self.sync_client = kwargs.get("sync_client") or OpenAI(
-            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-        )
-        self.async_client = kwargs.get("async_client") or AsyncOpenAI(
-            base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
-        )
+            self.sync_client = kwargs.get("sync_client") or OpenAI(
+                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+            )
+            self.async_client = kwargs.get("async_client") or AsyncOpenAI(
+                base_url=f"http://127.0.0.1:{self.port}/v1", api_key="not-needed"
+            )
 
-        self.timeout = kwargs.get("timeout", 30)
-        self._server_running = False
-        self._context_depth = 0
+            self.timeout = kwargs.get("timeout", 30)
+            self._server_running = False
+            self._context_depth = 0
 
-        self.disable_kv_offload = config.disable_kv_offload
-        self.llamafile_kvargs = config.llamafile_kvargs
+            self.disable_kv_offload = config.disable_kv_offload
+            self.llamafile_kvargs = config.llamafile_kvargs
 
-        self.metadata = {
-            "model_id": model,
-            "model_type": "llamafile",
-        }
+            self.metadata = {
+                "model_id": model,
+                "model_type": "llamafile",
+            }
+
+        except Exception as e:
+            raise LlamafileError(
+                status_code=2,
+                message=f"An error occurred while initializing the Llamafile model: {str(e)}\n"
+                        "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
+                        "pip install flow-judge[...,llamafile]"
+            ) from e
 
     def is_server_running(self):
         try:
@@ -331,7 +353,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
 
 class LlamafileError(Exception):
+    """Custom exception for Llamafile-related errors."""
+
     def __init__(self, status_code: int, message: str):
+        """Initialize a LlamafileError with a status code and message."""
         self.status_code = status_code
         self.message = message
         super().__init__(self.message)

@@ -12,7 +12,6 @@ class EvalInput(BaseModel):
     inputs: list[dict[str, str]] = Field(default_factory=list)
     output: dict[str, str]
 
-
 class EvalOutput(BaseModel):
     """Output model for evaluation results."""
 
@@ -23,29 +22,18 @@ class EvalOutput(BaseModel):
     def parse(cls, response: str, fail_on_parse_error: bool = False) -> "EvalOutput":
         """Parse the evaluation response from the judge."""
         try:
-            # Pattern to match feedback (potentially including the score)
-            feedback_pattern = re.compile(r"<feedback>\s*([\s\S]*?)\s*(?:</feedback>)?", re.DOTALL)
-            # Pattern to match score, either inside or outside feedback tags
+            # Compile regex patterns
+            feedback_pattern = re.compile(r"<feedback>\s*(.*?)\s*</feedback>", re.DOTALL)
             score_pattern = re.compile(r"<score>\s*(\d+)\s*</score>", re.DOTALL)
 
             feedback_match = feedback_pattern.search(response)
-            if not feedback_match:
-                raise ValueError("Failed to find feedback in the response")
+            score_match = score_pattern.search(response)
+
+            if not feedback_match or not score_match:
+                raise ValueError("Failed to parse evaluation response.")
 
             feedback = feedback_match.group(1).strip()
-
-            # Look for score within the feedback
-            score_match = score_pattern.search(feedback)
-            if score_match:
-                # If score is found within feedback, remove it from feedback
-                score = int(score_match.group(1))
-                feedback = re.sub(score_pattern, '', feedback).strip()
-            else:
-                # If score is not in feedback, look for it in the entire response
-                score_match = score_pattern.search(response)
-                if not score_match:
-                    raise ValueError("Failed to find score in the response")
-                score = int(score_match.group(1))
+            score = int(score_match.group(1).strip())
 
             return cls(feedback=feedback, score=score)
         except Exception as e:

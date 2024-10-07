@@ -73,7 +73,7 @@ class FlowJudge(BaseFlowJudge):
         try:
             self._validate_inputs(eval_input)
             prompt = self._format_prompt(eval_input)
-            response = self.model.generate(prompt)
+            response = self.model._generate(prompt)
             eval_output = EvalOutput.parse(response)
             if save_results:
                 self._save_results([eval_input], [eval_output])

@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import numpy as np
 from haystack import component, default_from_dict, default_to_dict
 from haystack.utils import deserialize_type
 
@@ -93,7 +94,12 @@ class HaystackFlowJudge:
                 to be a list of str but received {outputs}."
             raise ValueError(msg)
 
-    @component.output_types(results=list[dict[str, Any]])
+    @component.output_types(
+        results=list[dict[str, Any]],
+        metadata=dict[str, Any],
+        score=float,
+        individual_scores=list[float],
+    )
     def run(self, **inputs) -> dict[str, Any]:
         """Run the FlowJudge evaluator on the provided inputs."""
         self._validate_input_parameters(dict(self.inputs), inputs)
@@ -105,7 +111,7 @@ class HaystackFlowJudge:
         )
 
         results: list[dict[str, Any] | None] = []
-        errors = 0
+        parsing_errors = 0
         for eval_output in eval_outputs:
             if eval_output.score != -1:
                 result = {
@@ -115,16 +121,28 @@ class HaystackFlowJudge:
 
                 results.append(result)
             else:
-                results.append(None)
-                errors += 1
+                results.append({"feedback": eval_output.feedback, "score": eval_output.score})
+                parsing_errors += 1
 
-        if errors > 0:
-            msg = f"FlowJudge failed to parse {errors} results."
+        if parsing_errors > 0:
+            msg = (
+                f"FlowJudge failed to parse {parsing_errors} results out "
+                f"of {len(eval_outputs)}. Score and Individual Scores are "
+                "based on the successfully parsed results."
+            )
             logger.warning(msg)
 
         metadata = self.model.metadata
 
-        return {"results": results, "metadata": metadata}
+        score = np.mean([result["score"] for result in results if result["score"] != -1])
+        individual_scores = [float(result["score"]) for result in results if result["score"] != -1]
+
+        return {
+            "results": results,
+            "metadata": metadata,
+            "score": score,
+            "individual_scores": individual_scores,
+        }
 
     @staticmethod
     def _validate_input_parameters(expected: dict[str, Any], received: dict[str, Any]) -> None:

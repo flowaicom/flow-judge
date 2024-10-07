@@ -8,7 +8,6 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from flow_judge.models.base import BaseFlowJudgeModel
-from flow_judge.utils.prompt_formatter import format_user_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -38,30 +37,30 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
                 "Running the FlowJudgeHFModel on CPU may result in longer inference times."
             )
 
-        self.batch_size = self._determine_batch_size()
+        self.batch_size = 1  # Default to 1, will be updated in batch_generate
 
-    def _determine_batch_size(self) -> int:
-        """Determine an appropriate batch size based on available GPU memory."""
+    def _determine_batch_size(self, prompts: list[str]) -> int:
+        """Determine an appropriate batch size based on available GPU memory and eval_inputs."""
         if self.device == "cpu":
             return 1  # Default to 1 for CPU
 
-        # Start with a batch size of 1 and double it until we run out of memory
         batch_size = 1
         max_length = self.generation_params.get("max_model_len", 8192)
-
-        # Create a sample prompt using the format_user_prompt function
-        sample_prompt_variables = {
-            "INPUTS": "Sample input for batch size determination" * 10,
-            "OUTPUT": "Sample output for batch size determination" * 5,
-            "EVALUATION_CRITERIA": "Sample evaluation criteria" * 3,
-            "RUBRIC": "Sample rubric" * 5,
-        }
-        sample_input = format_user_prompt(sample_prompt_variables)
+        max_new_tokens = self.generation_params.get("max_new_tokens", 1024)
 
         while True:
             try:
-                # Prepare a batch of inputs
-                inputs = [sample_input] * batch_size
+                # Prepare a batch of inputs using the longest input
+                longest_input = max(prompts, key=lambda x: len(self.tokenizer.encode(x)))
+                # Check if the longest input exceeds max_length
+                input_length = len(self.tokenizer.encode(longest_input))
+                if input_length > max_length:
+                    logger.warning(
+                        f"Input length {input_length} exceeds max_length {max_length}. "
+                        f"Truncated inputs can result in suboptimal performance."
+                    )
+
+                inputs = [longest_input] * batch_size
                 encoded_inputs = self.tokenizer(
                     inputs,
                     return_tensors="pt",
@@ -70,23 +69,23 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
                     max_length=max_length,
                 ).to(self.device)
 
-                # Perform a forward pass
+                # Simulate generation
                 with torch.no_grad():
-                    _ = self.model(**encoded_inputs)
+                    _ = self.model.generate(
+                        **encoded_inputs, max_new_tokens=max_new_tokens, do_sample=False
+                    )
 
                 # If successful, double the batch size and try again
                 batch_size *= 2
-                torch.cuda.empty_cache()  # Clear GPU memory
-                del encoded_inputs  # Remove references to tensors
+                torch.cuda.empty_cache()
+                del encoded_inputs
             except RuntimeError as e:
                 if "out of memory" in str(e).lower():
-                    # We've found the limit, so use the last successful batch size
                     optimal_batch_size = max(1, batch_size // 2)
                     logger.info(f"Automatically determined batch size: {optimal_batch_size}")
-                    torch.cuda.empty_cache()  # Final cleanup
+                    torch.cuda.empty_cache()
                     return optimal_batch_size
                 else:
-                    # If it's not an OOM error, re-raise the exception
                     raise
 
     def generate(self, prompt: str) -> str:
@@ -106,6 +105,9 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
     def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
         """Generate responses for multiple prompts using batching."""
         all_results = []
+
+        # Determine optimal batch size using the current prompts
+        self.batch_size = self._determine_batch_size(prompts)
 
         # Create batches using the automatically determined batch size
         batches = [
@@ -128,15 +130,14 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
             inputs = self.tokenizer(
                 chat_prompts, return_tensors="pt", padding=True, truncation=True
             ).to(self.device)
-
+            input_tok_lens = [len(input) for input in inputs["input_ids"]]
             # Generate outputs
             outputs = self.model.generate(**inputs, **self.generation_params)
 
             # Decode outputs
             batch_results = []
-            for i, output in enumerate(outputs):
-                input_length = len(self.tokenizer.encode(chat_prompts[i], add_special_tokens=False))
-                result = self.tokenizer.decode(output[input_length:], skip_special_tokens=True)
+            for output, input_tok_len in zip(outputs, input_tok_lens, strict=True):
+                result = self.tokenizer.decode(output[input_tok_len:], skip_special_tokens=False)
                 batch_results.append(result.strip())
 
             all_results.extend(batch_results)

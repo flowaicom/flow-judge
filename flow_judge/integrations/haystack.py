@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List, Dict, Optional
+from typing import Any
 
 import numpy as np
 from haystack import component, default_from_dict, default_to_dict
@@ -95,77 +95,53 @@ class HaystackFlowJudge:
             raise ValueError(msg)
 
     @component.output_types(
-        results=List[Optional[Dict[str, Any]]],
-        metadata=Dict[str, Any],
+        results=list[dict[str, Any]],
+        metadata=dict[str, Any],
         score=float,
-        individual_scores=List[float],
-        error_summary=Dict[str, int],
+        individual_scores=list[float],
     )
-    def run(self, **inputs) -> Dict[str, Any]:
+    def run(self, **inputs) -> dict[str, Any]:
         """Run the FlowJudge evaluator on the provided inputs."""
         self._validate_input_parameters(dict(self.inputs), inputs)
-        eval_inputs: List[EvalInput] = self._prepare_inputs(inputs=inputs, metric=self.metric)
-        eval_outputs: List[EvalOutput] = self.judge.batch_evaluate(
+        eval_inputs: list[EvalInput] = self._prepare_inputs(inputs=inputs, metric=self.metric)
+        eval_outputs: list[EvalOutput] = self.judge.batch_evaluate(
             eval_inputs,
             save_results=self.save_results,
             fail_on_parse_error=self.fail_on_parse_error,
         )
 
-        results: List[Optional[Dict[str, Any]]] = []
+        results: list[dict[str, Any] | None] = []
         parsing_errors = 0
-        other_errors = 0
-
         for eval_output in eval_outputs:
             if eval_output.score != -1:
                 result = {
                     "feedback": eval_output.feedback,
                     "score": eval_output.score,
                 }
+
                 results.append(result)
             else:
-                results.append(None)
-                if "parsing error" in eval_output.feedback.lower():
-                    parsing_errors += 1
-                    if self.fail_on_parse_error:
-                        raise ValueError(f"Parsing error encountered: {eval_output.feedback}")
-                else:
-                    other_errors += 1
+                results.append({"feedback": eval_output.feedback, "score": eval_output.score})
+                parsing_errors += 1
 
-        total_errors = parsing_errors + other_errors
-        if total_errors > 0:
-            error_msg = f"FlowJudge encountered errors in {total_errors} out of {len(eval_outputs)} evaluations."
-            error_msg += f"\n- Parsing errors: {parsing_errors}"
-            error_msg += f"\n- Other errors: {other_errors}"
-            logger.warning(error_msg)
+        if parsing_errors > 0:
+            msg = (
+                f"FlowJudge failed to parse {parsing_errors} results out "
+                f"of {len(eval_outputs)}. Score and Individual Scores are "
+                "based on the successfully parsed results."
+            )
+            logger.warning(msg)
 
         metadata = self.model.metadata
 
-        valid_scores = [result["score"] for result in results if result is not None]
-
-        if not valid_scores:
-            logger.warning("No valid scores were generated. All evaluations failed.")
-            score = 0.0
-            individual_scores = []
-        else:
-            score = np.mean(valid_scores)
-            individual_scores = [float(s) for s in valid_scores]
-
-        error_summary = {
-            "total_evaluations": len(eval_outputs),
-            "successful_evaluations": len(valid_scores),
-            "parsing_errors": parsing_errors,
-            "other_errors": other_errors,
-        }
-
-        # Add error information to metadata
-        metadata["error_summary"] = error_summary
+        score = np.mean([result["score"] for result in results if result["score"] != -1])
+        individual_scores = [float(result["score"]) for result in results if result["score"] != -1]
 
         return {
             "results": results,
             "metadata": metadata,
             "score": score,
             "individual_scores": individual_scores,
-            "error_summary": error_summary,
         }
 
     @staticmethod

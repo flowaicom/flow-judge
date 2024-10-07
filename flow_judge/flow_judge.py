@@ -1,8 +1,5 @@
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
-from flow_judge.models.llamafile import Llamafile
 
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.metrics import CustomMetric, Metric
@@ -10,7 +7,6 @@ from flow_judge.models.base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from flow_judge.utils.prompt_formatter import format_rubric, format_user_prompt, format_vars
 from flow_judge.utils.result_writer import write_results_to_disk
 from flow_judge.utils.validators import validate_eval_input
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -72,11 +68,6 @@ class FlowJudge(BaseFlowJudge):
         if not isinstance(model, BaseFlowJudgeModel):
             raise ValueError("Invalid model type. Use BaseFlowJudgeModel or its subclasses.")
 
-        self.output_dir = output_dir
-        os.makedirs(self.output_dir, exist_ok=True)
-        if not os.access(self.output_dir, os.W_OK):
-            raise PermissionError(f"No write access to output directory: {self.output_dir}")
-
     def evaluate(self, eval_input: EvalInput, save_results: bool = False) -> EvalOutput:
         """Evaluate a single EvalInput object."""
         try:
@@ -97,43 +88,20 @@ class FlowJudge(BaseFlowJudge):
         use_tqdm: bool = True,
         save_results: bool = True,
         fail_on_parse_error: bool = False,
-        timeout: float = 60.0,
-        max_workers: int = 5
     ) -> list[EvalOutput]:
         """Batch evaluate a list of EvalInput objects."""
         self._validate_inputs(eval_inputs)
         prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
-
-        if isinstance(self.model, Llamafile):
-            with self.model:
-                # Use Llamafile's batch_generate method
-                responses = self.model.batch_generate(prompts, use_tqdm=use_tqdm)
-        else:
-            # Use the original processing method for other model types
-            def process_prompt(prompt):
-                try:
-                    response = self.model.generate(prompt)
-                    return response
-                except Exception as e:
-                    logger.error(f"Error processing prompt: {e}")
-                    return f"Error: {str(e)}"
-
-            if use_tqdm:
-                responses = [process_prompt(prompt) for prompt in tqdm(prompts, desc="Processing prompts")]
-            else:
-                responses = [process_prompt(prompt) for prompt in prompts]
-
-        # Parse the responses
+        responses = self.model.batch_generate(prompts, use_tqdm=use_tqdm)
         eval_outputs = [
             EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
             for response in responses
         ]
-
         parse_failures = sum(1 for output in eval_outputs if output.score == -1)
         if save_results:
             self._save_results(eval_inputs, eval_outputs)
         if parse_failures > 0:
-            logger.warning(f"Number of parsing failures: {parse_failures} out of {len(eval_outputs)}")
+            logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")
 
         return eval_outputs
 

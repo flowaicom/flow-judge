@@ -1,21 +1,24 @@
+from typing import Optional
+
 from .base import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from .huggingface import FlowJudgeHFModel
-from .model_configs import MODEL_CONFIGS, ModelConfig
+from .model_configs import MODEL_CONFIGS, ModelConfig, BaseModelConfig, RemoteModelConfig
 from .model_types import ModelType
 from .vllm import AsyncFlowJudgeVLLMModel, FlowJudgeVLLMModel, VLLMError
-
+from .remote import FlowJudgeRemoteModel
+from .adapters.base import BaseAPIAdapter
 
 class ModelFactory:
     """Factory class for creating model instances based on the provided configuration."""
 
     @staticmethod
-    def create_model(config: str | ModelConfig) -> BaseFlowJudgeModel:
+    def create_model(config: str | ModelConfig, api_adapter: Optional[BaseAPIAdapter] = None) -> BaseFlowJudgeModel:
         """Create and return a model based on the provided configuration."""
         if isinstance(config, str):
             if config not in MODEL_CONFIGS:
                 raise ValueError(f"Unknown config: {config}")
             model_config = MODEL_CONFIGS[config]
-        elif isinstance(config, ModelConfig):
+        elif isinstance(config, BaseModelConfig):
             model_config = config
         else:
             raise ValueError(
@@ -28,6 +31,10 @@ class ModelFactory:
             return ModelFactory._create_vllm_model(model_config)
         elif model_config.model_type == ModelType.VLLM_ASYNC:
             return ModelFactory._create_vllm_async_model(model_config)
+        elif model_config.model_type == ModelType.REMOTE_HOSTING:
+            if not api_adapter:
+                raise ValueError("API adapter is required for remote models.")
+            return ModelFactory._create_remote_model(model_config, api_adapter)
         else:
             raise ValueError(f"Unsupported model type: {model_config.model_type}")
 
@@ -61,6 +68,15 @@ class ModelFactory:
             )
         except VLLMError as e:
             raise ValueError(f"Failed to create asynchronous vLLM model: {e.message}") from e
+        
+    @staticmethod
+    def _create_remote_model(config: RemoteModelConfig, api_adapter: BaseAPIAdapter) -> FlowJudgeRemoteModel:
+        return FlowJudgeRemoteModel(
+            model_id=config.model_id,
+            model_type=config.model_type,
+            generation_params=config.generation_params,
+            api_adapter=api_adapter
+        )
 
     @staticmethod
     def is_async_model(model: BaseFlowJudgeModel | AsyncBaseFlowJudgeModel) -> bool:

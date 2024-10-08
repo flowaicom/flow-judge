@@ -2,8 +2,14 @@ from typing import Any
 
 from .model_types import ModelType
 
+class BaseModelConfig:
+    """Base config for both hosted and local models."""
 
-class ModelConfig:
+    def __init__(self, model_id: str, model_type: ModelType):
+        self.model_id = model_id
+        self.model_type = model_type
+
+class ModelConfig(BaseModelConfig):
     """Configuration for a model."""
 
     def __init__(
@@ -14,8 +20,7 @@ class ModelConfig:
         **kwargs: dict[str, Any],
     ):
         """Initialize the model config."""
-        self.model_id = model_id
-        self.model_type = model_type
+        super().__init__(model_id, model_type)
         self.generation_params = generation_params
         if model_type == ModelType.TRANSFORMERS:
             self.hf_kwargs = kwargs
@@ -24,6 +29,20 @@ class ModelConfig:
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
+class RemoteModelConfig(BaseModelConfig):
+    """Config for hosted models."""
+    
+    def __init__(
+            self,
+            model_id: str,
+            model_type: ModelType,
+            generation_params: dict[str, Any]
+        ):
+        if not model_type == ModelType.REMOTE_HOSTING:
+            raise ValueError("Unsupported model type for remote hosting. Try ModelConfig instead.")
+        
+        super().__init__(model_id, model_type)
+        self.generation_params = generation_params
 
 MODEL_CONFIGS = {
     "Flow-Judge-v0.1-AWQ": ModelConfig(
@@ -93,6 +112,11 @@ MODEL_CONFIGS = {
         disable_sliding_window=True,
         disable_log_requests=False,
     ),
+    "Flow-Judge-v0.1-Remote": RemoteModelConfig(
+        model_id="",
+        model_type=ModelType.REMOTE_HOSTING,
+        generation_params={"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
+    )
 }
 
 

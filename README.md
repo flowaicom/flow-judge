@@ -63,22 +63,31 @@ pip install 'flash_attn>=2.6.3' --no-build-isolation
 ```
 
 Extras available:
-- `dev` for development dependencies
-- `hf` for Hugging Face Transformers support
-- `vllm` for vLLM support
+- `dev` to install development dependencies
+- `hf` to install Hugging Face Transformers dependencies
+- `vllm` to install vLLM dependencies
+- `llamafile` to install Llamafile dependencies
 
 ## Quick Start
 
 Here's a simple example to get you started:
 
 ```python
-from flow_judge.models.model_factory import ModelFactory
-from flow_judge.flow_judge import EvalInput, FlowJudge
+from flow_judge import Vllm, Llamafile, Hf, EvalInput, FlowJudge
 from flow_judge.metrics import RESPONSE_FAITHFULNESS_5POINT
 from IPython.display import Markdown, display
 
-# Create a model using ModelFactory
-model = ModelFactory.create_model("Flow-Judge-v0.1-AWQ")
+# If you are running on an Ampere GPU or newer, create a model using VLLM
+model = Vllm()
+
+# If you have other applications open taking up VRAM, you can use less VRAM by setting gpu_memory_utilization to a lower value.
+# model = Vllm(gpu_memory_utilization=0.70)
+
+# Or if not running on Ampere GPU or newer, create a model using no flash attn and Hugging Face Transformers
+# model = Hf(flash_attn=False)
+
+# Or create a model using Llamafile if not running an Nvidia GPU & running a Silicon MacOS for example
+# model = Llamafile()
 
 # Initialize the judge
 faithfulness_judge = FlowJudge(
@@ -110,14 +119,57 @@ display(Markdown(f"__Feedback:__\n{result.feedback}\n\n__Score:__\n{result.score
 
 ## Usage
 
-### Supported Model Types
+### Inference Options
 
-- Hugging Face Transformers (`hf_transformers`)
-- vLLM (`vllm`)
+The library supports multiple inference backends to accommodate different hardware configurations and performance needs:
+
+1. **vLLM**:
+   - Best for NVIDIA GPUs with Ampere architecture or newer (e.g., RTX 3000 series, A100, H100)
+   - Offers the highest performance and throughput
+   - Requires CUDA-compatible GPU
+
+   ```python
+   from flow_judge import Vllm
+
+   model = Vllm()
+   ```
+
+2. **Hugging Face Transformers**:
+   - Compatible with a wide range of hardware, including older NVIDIA GPUs
+   - Supports CPU inference (slower but universally compatible)
+   - It is slower than vLLM but generally compatible with more hardware.
+
+    If you are running on an Ampere GPU or newer:
+   ```python
+   from flow_judge import Hf
+
+   model = Hf()
+   ```
+
+   If you are not running on an Ampere GPU or newer, disable flash attention:
+   ```python
+   from flow_judge import Hf
+
+   model = Hf(flash_attn=False)
+   ```
+
+3. **Llamafile**:
+   - Ideal for non-NVIDIA hardware, including Apple Silicon
+   - Provides good performance on CPUs
+   - Self-contained, easy to deploy option
+
+   ```python
+   from flow_judge import Llamafile
+
+   model = Llamafile()
+   ```
+
+Choose the inference backend that best matches your hardware and performance requirements. The library provides a unified interface for all these options, making it easy to switch between them as needed.
+
 
 ### Evaluation Metrics
 
-Flow-Judge-v0.1 was trained to handle any custom metric that can be expressed as a combination of evaluation criteria and rubric, and required inputs and outputs.
+`Flow-Judge-v0.1` was trained to handle any custom metric that can be expressed as a combination of evaluation criteria and rubric, and required inputs and outputs.
 
 #### Pre-defined Metrics
 
@@ -136,13 +188,12 @@ For efficient processing of multiple inputs, you can use the `batch_evaluate` me
 ```python
 # Read the sample data
 import json
-from flow_judge.models.model_factory import ModelFactory
-from flow_judge.flow_judge import EvalInput, FlowJudge
+from flow_judge import Vllm, EvalInput, FlowJudge
 from flow_judge.metrics import RESPONSE_FAITHFULNESS_5POINT
 from IPython.display import Markdown, display
 
-# Create a model using ModelFactory
-model = ModelFactory.create_model("Flow-Judge-v0.1-AWQ")
+# Initialize the model
+model = Vllm()
 
 # Initialize the judge
 faithfulness_judge = FlowJudge(
@@ -150,7 +201,7 @@ faithfulness_judge = FlowJudge(
     model=model
 )
 
-# Load data
+# Load some sampledata
 with open("sample_data/csr_assistant.json", "r") as f:
     data = json.load(f)
 
@@ -179,13 +230,9 @@ for i, result in enumerate(results):
 
 ## Advanced Usage
 
-### Model configurations
 > [!WARNING]
 > There is a reported issue with Phi-3 models that produces gibberish outputs with contexts longer than 4096 tokens, including input and output. This issue has been recently fixed in the transformers library so we recommend using the `Flow-Judge-v0.1_HF` model configuration for longer contexts at the moment. For more details, refer to: [#33129](https://github.com/huggingface/transformers/pull/33129) and [#6135](https://github.com/vllm-project/vllm/issues/6135)
 
-We currently support vLLM engine (recommended) and Hugging Face Transformers.
-
-We are working on adding API-based usage as well as better options for CPU.
 
 ### Custom Metrics
 

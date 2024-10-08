@@ -2,9 +2,9 @@ name: Python package
 
 on:
   push:
-    branches: [ "feat/llamafile" ]
+    branches: [ "main", "feat/llamafile" ]
   pull_request:
-    branches: [ "feat/llamafile" ]
+    branches: [ "main", "feat/llamafile" ]
 
 jobs:
   build:
@@ -24,6 +24,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install .[dev,vllm,hf,llamafile]
+    - name: Verify GPU availability
+      run: |
+        nvidia-smi
+        python -c "import torch; print(torch.cuda.is_available())"
     - name: Lint with ruff
       run: |
         ruff check . || true

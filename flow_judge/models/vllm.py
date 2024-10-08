@@ -28,7 +28,7 @@ class VllmConfig(ModelConfig):
         max_model_len: int = 8192,
         trust_remote_code: bool = True,
         enforce_eager: bool = True,
-        dtype: str = "auto",
+        dtype: str = "bfloat16",
         disable_sliding_window: bool = True,
         gpu_memory_utilization: float = 0.90,
         max_num_seqs: int = 256,

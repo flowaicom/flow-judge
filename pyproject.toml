@@ -48,6 +48,7 @@ hf = [
 ]
 vllm = ["vllm>=0.6.2"]
 llamafile = [
+    "torch>=2.3.0",
     "openai>=1.51.0",
 ]
 

@@ -9,24 +9,9 @@ Below is the current test coverage visualization for the Flow Judge project:
 
 <p align="center">
   <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
-    <img src="https://codecov.io/gh/flowaicom/flow-judge/graphs/icicle.svg?token=AEGC7W3DGE" alt="Codecov Icicle Graph">
+    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/feat%2Fllamafile/graphs/icicle.svg?token=AEGC7W3DGE" alt="Codecov Icicle Graph">
   </a>
 </p>
-
-
-## Directory Structure
-tests/
-├── README.md
-├── unit/
-│ ├── test_flow_judge.py
-│ ├── test_metrics.py
-│ └── test_models.py
-├── integration/
-│ ├── test_evaluation_pipeline.py
-│ └── test_model_integration.py
-└── fixtures/
-└── sample_data.json
-
 
 ## Running Tests
 
@@ -34,18 +19,14 @@ To run the entire test suite:
 ```sh
 pytest
 ```
-
-
 To run a specific test file:
 ```sh
 pytest tests/unit/test_flow_judge.py
 ```
-
 To run tests with coverage report:
 ```sh
 pytest --cov=flow_judge --cov-report=term-missing
 ```
-
 
 ## Contributing
 

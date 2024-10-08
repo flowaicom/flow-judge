@@ -240,7 +240,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                   f"--threads {self.generation_params.get('thread_count', os.cpu_count() or 1)} " \
                   f"--nobrowser -b {self.generation_params.get('batch_size', 32)} " \
                   f"--parallel {self.generation_params.get('max_concurrent_requests', 1)} " \
-                  f"--cont-batching'"
+                  f"--cont-batching"
 
         if self.disable_kv_offload:
             command += " -nkvo"
@@ -261,6 +261,8 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         for key, value in self.llamafile_server_kwargs.items():
             command += f" --{key} {value}"
             logging.info(f"Additional server argument added: --{key} {value}")
+
+        command += "'"
 
         logging.info(f"Starting llamafile server with command: {command}")
 

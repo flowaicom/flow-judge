@@ -119,10 +119,10 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 self.model = LLM(**engine_args)
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-        except ImportError as e:
+        except Exception as e:
             raise VllmError(
-                status_code=1,
-                message="Failed to import 'vllm' package. Make sure it is installed correctly.",
+                status_code=3,
+                message=f"An unexpected error occurred while initializing vLLM: {str(e)}",
             ) from e
 
     def _generate(self, prompt: str) -> str:

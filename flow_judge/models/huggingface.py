@@ -1,45 +1,126 @@
 import logging
 import os
-from typing import Any
+import warnings
+from typing import Any, Dict, List
 
-import torch
-from huggingface_hub import snapshot_download
+from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType, GenerationParams
+
+try:
+    import torch
+    from huggingface_hub import snapshot_download
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    HF_AVAILABLE = True
+except ImportError:
+    HF_AVAILABLE = False
+
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from flow_judge.models.base import BaseFlowJudgeModel
 
 logger = logging.getLogger(__name__)
 
 
-class FlowJudgeHFModel(BaseFlowJudgeModel):
+class HfConfig(ModelConfig):
+    def __init__(
+        self,
+        model_id: str,
+        generation_params: GenerationParams,
+        device_map: str = "auto",
+        torch_dtype: str = "bfloat16",
+        flash_attn: bool = True,
+        **kwargs: Any,
+    ):
+        super().__init__(model_id, ModelType.TRANSFORMERS, generation_params.model_dump(), **kwargs)
+        self.device_map = device_map
+        self.torch_dtype = torch_dtype
+        self.flash_attn = flash_attn
+        self.kwargs = kwargs
+
+
+class Hf(BaseFlowJudgeModel):
     """FlowJudge model class for Hugging Face Transformers."""
 
-    def __init__(self, model_id: str, generation_params: dict[str, Any], **hf_kwargs: Any):
+    def __init__(
+        self,
+        model_id: str = None,
+        generation_params: Dict[str, Any] = None,
+        flash_attn: bool = True,
+        **kwargs: Any,
+    ):
         """Initialize the FlowJudge Hugging Face Transformers model."""
-        super().__init__(model_id, "transformers", generation_params, **hf_kwargs)
-
-        os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-
-        # Download the entire repository
-        logger.info(
-            "Downloading the model from Hugging Face Hub using hf-transfer for faster downloads..."
-        )
-        snapshot_download(repo_id=model_id)
-
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, **hf_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, **hf_kwargs)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.generation_params = generation_params
-
-        if self.device == "cpu":
-            logger.warning(
-                "Running the FlowJudgeHFModel on CPU may result in longer inference times."
+        if not HF_AVAILABLE:
+            raise HfError(
+                status_code=1,
+                message="The required Hugging Face packages are not installed. "
+                "Please install them by adding 'hf' to your extras:\n"
+                "pip install flow-judge[hf]",
             )
 
-        self.batch_size = 1  # Default to 1, will be updated in batch_generate
+        default_model_id = "flowaicom/Flow-Judge-v0.1"
 
-    def _determine_batch_size(self, prompts: list[str]) -> int:
+        if model_id is not None and model_id != default_model_id:
+            warnings.warn(
+                f"The model '{model_id}' is not officially supported. "
+                f"This library is designed for the '{default_model_id}' model. "
+                "Using other models may lead to unexpected behavior, and we do not handle "
+                "GitHub issues for unsupported models. Proceed with caution.",
+                UserWarning
+            )
+
+        model_id = model_id or default_model_id
+
+        generation_params = GenerationParams(**(generation_params or {}))
+
+        config = HfConfig(
+            model_id=model_id, generation_params=generation_params, flash_attn=flash_attn, **kwargs
+        )
+
+        super().__init__(model_id, "transformers", config.generation_params, **kwargs)
+
+        try:
+            os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
+            logger.info(
+                "Downloading the model from Hugging Face Hub using hf-transfer for faster downloads..."
+            )
+            snapshot_download(repo_id=model_id)
+
+            model_kwargs = {
+                "device_map": config.device_map,
+                "torch_dtype": getattr(torch, config.torch_dtype),
+            }
+            if config.flash_attn:
+                model_kwargs["attn_implementation"] = "flash_attention_2"
+
+            # Include any additional kwargs that might be relevant for model initialization
+            for key, value in config.kwargs.items():
+                if (
+                    key not in model_kwargs
+                    and key in AutoModelForCausalLM.from_pretrained.__code__.co_varnames
+                ):
+                    model_kwargs[key] = value
+
+            self.model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.generation_params = generation_params.model_dump()
+            self.config = config
+
+            if self.device == "cpu":
+                logger.warning(
+                    "Running Hf on CPU may result in longer inference times."
+                )
+
+            self.batch_size = 1  # Default to 1, will be updated in batch_generate
+
+        except Exception as e:
+            raise HfError(
+                status_code=2,
+                message=f"An error occurred while initializing the Hugging Face model: {str(e)}\n"
+                "Please make sure you have installed all required dependencies by adding 'hf' to your extras:\n"
+                "pip install flow-judge[hf]",
+            ) from e
+
+    def _determine_batch_size(self, prompts: List[str]) -> int:
         """Determine an appropriate batch size based on available GPU memory and eval_inputs."""
         if self.device == "cpu":
             return 1  # Default to 1 for CPU
@@ -88,7 +169,18 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
                 else:
                     raise
 
-    def generate(self, prompt: str) -> str:
+    def _prepare_generation_kwargs(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Prepare generation kwargs by combining generation params,
+        passed kwargs, and relevant config kwargs.
+        """
+        generation_kwargs = {**self.generation_params, **kwargs}
+        for key, value in self.config.kwargs.items():
+            if key not in generation_kwargs and key in self.model.generate.__code__.co_varnames:
+                generation_kwargs[key] = value
+        return generation_kwargs
+
+    def _generate(self, prompt: str) -> str:
         """Generate a response using the FlowJudge Hugging Face Transformers model."""
         chat_prompt = self.tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True
@@ -96,27 +188,27 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
         inputs = self.tokenizer(chat_prompt, return_tensors="pt").to(self.device)
         input_length = inputs.input_ids.shape[1]
 
-        outputs = self.model.generate(**inputs, **self.generation_params)
+        generation_kwargs = self._prepare_generation_kwargs()
+        outputs = self.model.generate(**inputs, **generation_kwargs)
 
-        # Decode only the generated part (excluding the input)
         generated_text = self.tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
         return generated_text.strip()
 
-    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+    def _batch_generate(
+        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> List[str]:
         """Generate responses for multiple prompts using batching."""
         all_results = []
 
-        # Determine optimal batch size using the current prompts
         self.batch_size = self._determine_batch_size(prompts)
 
-        # Create batches using the automatically determined batch size
         batches = [
             prompts[i : i + self.batch_size] for i in range(0, len(prompts), self.batch_size)
         ]
 
-        # Process each batch
+        generation_kwargs = self._prepare_generation_kwargs(**kwargs)
+
         for batch in tqdm(batches, disable=not use_tqdm, desc="Processing batches"):
-            # Apply chat template to all prompts in the batch
             chat_prompts = [
                 self.tokenizer.apply_chat_template(
                     [{"role": "user", "content": prompt}],
@@ -126,15 +218,13 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
                 for prompt in batch
             ]
 
-            # Tokenize all prompts in the batch
             inputs = self.tokenizer(
                 chat_prompts, return_tensors="pt", padding=True, truncation=True
             ).to(self.device)
             input_tok_lens = [len(input) for input in inputs["input_ids"]]
-            # Generate outputs
-            outputs = self.model.generate(**inputs, **self.generation_params)
 
-            # Decode outputs
+            outputs = self.model.generate(**inputs, **generation_kwargs)
+
             batch_results = []
             for output, input_tok_len in zip(outputs, input_tok_lens, strict=True):
                 result = self.tokenizer.decode(output[input_tok_len:], skip_special_tokens=False)
@@ -143,3 +233,13 @@ class FlowJudgeHFModel(BaseFlowJudgeModel):
             all_results.extend(batch_results)
 
         return all_results
+
+
+class HfError(Exception):
+    """Custom exception for Hugging Face-related errors."""
+
+    def __init__(self, status_code: int, message: str):
+        """Initialize an HfError with a status code and message."""
+        self.status_code = status_code
+        self.message = message
+        super().__init__(self.message)

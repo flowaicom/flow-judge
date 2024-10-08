@@ -27,6 +27,7 @@ dependencies = [
     "hf-transfer>=0.1.1",
     "ipykernel>=6.29.0",
     "ipywidgets>=8.1.0",
+    "tqdm>=4.66.1",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +37,8 @@ dev = [
     "ruff",
     "black",
     "isort",
+    "pytest-cov",
+    "codecov",
 ]
 hf = [
     "transformers>=4.45.0",
@@ -44,6 +47,10 @@ hf = [
     "accelerate>=0.34.2",
 ]
 vllm = ["vllm>=0.6.2"]
+llamafile = [
+    "torch>=2.3.0",
+    "openai>=1.51.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

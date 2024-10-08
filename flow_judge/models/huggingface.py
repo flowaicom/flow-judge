@@ -1,10 +1,9 @@
 import logging
 import os
-from typing import Any, Dict, Optional
+import warnings
+from typing import Any, Dict, List
 
-from pydantic import BaseModel
-
-from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType
+from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType, GenerationParams
 
 try:
     import torch
@@ -18,13 +17,6 @@ except ImportError:
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
-
-
-class GenerationParams(BaseModel):
-    temperature: float = 0.1
-    top_p: float = 0.95
-    max_new_tokens: int = 1000
-    do_sample: bool = True
 
 
 class HfConfig(ModelConfig):
@@ -64,6 +56,16 @@ class Hf(BaseFlowJudgeModel):
             )
 
         default_model_id = "flowaicom/Flow-Judge-v0.1"
+
+        if model_id is not None and model_id != default_model_id:
+            warnings.warn(
+                f"The model '{model_id}' is not officially supported. "
+                f"This library is designed for the '{default_model_id}' model. "
+                "Using other models may lead to unexpected behavior, and we do not handle "
+                "GitHub issues for unsupported models. Proceed with caution.",
+                UserWarning
+            )
+
         model_id = model_id or default_model_id
 
         generation_params = GenerationParams(**(generation_params or {}))
@@ -118,7 +120,7 @@ class Hf(BaseFlowJudgeModel):
                 "pip install flow-judge[...,hf]",
             ) from e
 
-    def _determine_batch_size(self, prompts: list[str]) -> int:
+    def _determine_batch_size(self, prompts: List[str]) -> int:
         """Determine an appropriate batch size based on available GPU memory and eval_inputs."""
         if self.device == "cpu":
             return 1  # Default to 1 for CPU
@@ -193,8 +195,8 @@ class Hf(BaseFlowJudgeModel):
         return generated_text.strip()
 
     def _batch_generate(
-        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> list[str]:
+        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> List[str]:
         """Generate responses for multiple prompts using batching."""
         all_results = []
 

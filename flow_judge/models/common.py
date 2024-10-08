@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from pydantic import BaseModel
+
 
 class BaseFlowJudgeModel(ABC):
     """Base class for all FlowJudge models."""
@@ -56,6 +58,12 @@ class AsyncBaseFlowJudgeModel(ABC):
         """Generate responses for multiple prompts asynchronously."""
         pass
 
+class GenerationParams(BaseModel):
+    temperature: float = 0.1
+    top_p: float = 0.95
+    max_new_tokens: int = 1000
+    do_sample: bool = True
+
 
 class ModelType(Enum):
     """Enum for the type of model."""
@@ -63,7 +71,7 @@ class ModelType(Enum):
     TRANSFORMERS = "transformers"
     VLLM = "vllm"
     VLLM_ASYNC = "vllm_async"
-    LLAMAFILE = "llamafile"  # Add this line
+    LLAMAFILE = "llamafile"
 
 
 class Engine(Enum):

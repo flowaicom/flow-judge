@@ -1,12 +1,15 @@
 import asyncio
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from flow_judge.models.common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
     ModelConfig,
     ModelType,
+    GenerationParams,
 )
+
+import warnings
 
 try:
     import torch
@@ -21,7 +24,7 @@ class VllmConfig(ModelConfig):
     def __init__(
         self,
         model_id: str,
-        generation_params: Dict[str, Any] = {"temperature": 0.1, "top_p": 0.95, "max_tokens": 1000},
+        generation_params: GenerationParams,
         max_model_len: int = 8192,
         trust_remote_code: bool = True,
         enforce_eager: bool = True,
@@ -34,7 +37,7 @@ class VllmConfig(ModelConfig):
         **kwargs: Any,
     ):
         model_type = ModelType.VLLM_ASYNC if exec_async else ModelType.VLLM
-        super().__init__(model_id, model_type, generation_params, **kwargs)
+        super().__init__(model_id, model_type, generation_params.model_dump(), **kwargs)
         self.max_model_len = max_model_len
         self.trust_remote_code = trust_remote_code
         self.enforce_eager = enforce_eager
@@ -52,7 +55,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     def __init__(
         self,
         model: str = None,
-        generation_params: dict[str, Any] = None,
+        generation_params: Dict[str, Any] = None,
         quantized: bool = True,
         exec_async: bool = False,
         **kwargs: Any,
@@ -65,21 +68,29 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "pip install flow-judge[...,vllm]",
             )
 
-        base_model_id = "flowaicom/Flow-Judge-v0.1"
-        model_id = f"{base_model_id}-AWQ" if quantized else base_model_id
-        model = model or model_id
+        default_model_id = "flowaicom/Flow-Judge-v0.1"
 
-        config = VllmConfig(model_id=model, quantization=quantized, exec_async=exec_async, **kwargs)
+        if model is not None and model != default_model_id:
+            warnings.warn(
+                f"The model '{model}' is not officially supported. "
+                f"This library is designed for the '{default_model_id}' model. "
+                "Using other models may lead to unexpected behavior, and we do not handle "
+                "GitHub issues for unsupported models. Proceed with caution.",
+                UserWarning
+            )
 
-        generation_params = generation_params or config.generation_params
+        model = model or default_model_id
+        # Only append "-AWQ" if it's the default model and quantization is enabled
+        model_id = f"{model}-AWQ" if quantized and model == default_model_id else model
 
-        if exec_async:
-            kwargs["disable_log_requests"] = False
+        generation_params = GenerationParams(**(generation_params or {}))
 
-        super().__init__(model, "vllm", generation_params, **kwargs)
+        config = VllmConfig(model_id=model_id, generation_params=generation_params, quantization=quantized, exec_async=exec_async, **kwargs)
+
+        super().__init__(model, "vllm", config.generation_params, **kwargs)
 
         self.exec_async = exec_async
-        self.generation_params = generation_params
+        self.generation_params = config.generation_params
 
         try:
             if not torch.cuda.is_available():
@@ -89,7 +100,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 )
 
             engine_args = {
-                "model": model,
+                "model": model_id,
                 "max_model_len": config.max_model_len,
                 "trust_remote_code": config.trust_remote_code,
                 "enforce_eager": config.enforce_eager,
@@ -107,7 +118,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             else:
                 self.model = LLM(**engine_args)
 
-            self.tokenizer = AutoTokenizer.from_pretrained(model)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         except ImportError as e:
             raise VllmError(
                 status_code=1,
@@ -125,8 +136,8 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         return outputs[0].outputs[0].text.strip()
 
     def _batch_generate(
-        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> list[str]:
+        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> List[str]:
         """Generate responses for multiple prompts using the FlowJudge vLLM model."""
         if self.exec_async:
             return asyncio.run(self._async_batch_generate(prompts, use_tqdm, **kwargs))
@@ -160,8 +171,8 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         return ""
 
     async def _async_batch_generate(
-        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> list[str]:
+        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> List[str]:
         """Internal method for async batch generation."""
         conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
         formatted_prompts = [

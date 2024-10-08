@@ -9,12 +9,14 @@ from typing import Any, Dict, List
 
 import requests
 from tqdm import tqdm
+import warnings
 
 from flow_judge.models.common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
     ModelConfig,
     ModelType,
+    GenerationParams,
 )
 
 try:
@@ -34,33 +36,51 @@ class LlamafileConfig(ModelConfig):
     def __init__(
         self,
         model_id: str,
-        generation_params: Dict[str, Any],
+        generation_params: GenerationParams,
         model_filename: str = "flow-judge.llamafile",
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
         disable_kv_offload: bool = False,
-        llamafile_kvargs: str = "",
+        quantized_kv: bool = True,
+        flash_attn: bool = True,
+        llamafile_server_kwargs: Dict[str, Any] = None,
         **kwargs: Any,
     ):
-        super().__init__(model_id, ModelType.LLAMAFILE, generation_params, **kwargs)
+        super().__init__(model_id, ModelType.LLAMAFILE, generation_params.model_dump(), **kwargs)
         self.model_filename = model_filename
         self.cache_dir = cache_dir
         self.port = port
         self.disable_kv_offload = disable_kv_offload
-        self.llamafile_kvargs = llamafile_kvargs
+        self.quantized_kv = quantized_kv
+        self.flash_attn = flash_attn
+        self.llamafile_server_kwargs = llamafile_server_kwargs or {}
 
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
-    """Combined FlowJudge model class for Llamafile supporting both sync and async operations."""
+    """Combined FlowJudge model class for Llamafile supporting both sync and async operations.
+
+    Args:
+        model (str, optional): The model ID to use. Defaults to "sariola/flow-judge-llamafile".
+        generation_params (Dict[str, Any], optional): Generation parameters.
+        cache_dir (str, optional): Directory to cache the model. Defaults to "~/.cache/flow-judge".
+        port (int, optional): Port to run the Llamafile server on. Defaults to 8085.
+        disable_kv_offload (bool, optional): Whether to disable KV offloading. Defaults to False.
+        quantized_kv (bool, optional): Whether to enable Quantized KV. Defaults to True.
+        flash_attn (bool, optional): Whether to enable Flash Attention. Defaults to True.
+        llamafile_server_kwargs (Dict[str, Any], optional): Additional keyword arguments for the Llamafile server.
+        **kwargs: Additional keyword arguments.
+    """
 
     def __init__(
         self,
         model: str = None,
-        generation_params: dict[str, Any] = None,
+        generation_params: Dict[str, Any] = None,
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
         disable_kv_offload: bool = False,
-        llamafile_kvargs: str = "",
+        quantized_kv: bool = True,
+        flash_attn: bool = True,
+        llamafile_server_kwargs: Dict[str, Any] = None,
         **kwargs: Any,
     ):
         """Initialize the FlowJudge Llamafile model."""
@@ -73,20 +93,19 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             )
 
         default_model_id = "sariola/flow-judge-llamafile"
+
+        if model is not None and model != default_model_id:
+            warnings.warn(
+                f"The model '{model}' is not officially supported. "
+                f"This library is designed for the '{default_model_id}' model. "
+                "Using other models may lead to unexpected behavior, and we do not handle "
+                "GitHub issues for unsupported models. Proceed with caution.",
+                UserWarning
+            )
+
         model = model or default_model_id
 
-        default_generation_params = {
-            "temperature": 0.1,
-            "top_p": 0.95,
-            "max_tokens": 2000,
-            "context_size": 8192,
-            "gpu_layers": 34,
-            "thread_count": os.cpu_count() or 1,
-            "batch_size": 32,  # here batch doesn't mean parallel requests, it's just the batch size for the llamafile server
-            "max_concurrent_requests": 1,
-            "stop": ["<|endoftext|>"],
-        }
-        generation_params = generation_params or default_generation_params
+        generation_params = GenerationParams(**(generation_params or {}))
 
         config = LlamafileConfig(
             model_id=model,
@@ -95,14 +114,16 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             cache_dir=cache_dir,
             port=port,
             disable_kv_offload=disable_kv_offload,
-            llamafile_kvargs=llamafile_kvargs,
+            quantized_kv=quantized_kv,
+            flash_attn=flash_attn,
+            llamafile_server_kwargs=llamafile_server_kwargs,
             **kwargs,
         )
 
-        super().__init__(model, "llamafile", generation_params, **kwargs)
+        super().__init__(model, "llamafile", config.generation_params, **kwargs)
 
         try:
-            self.generation_params = generation_params
+            self.generation_params = config.generation_params
             self.cache_dir = config.cache_dir
             self.model_repo = config.model_id.split("/")[0]
             self.model_filename = config.model_filename
@@ -121,7 +142,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             self._context_depth = 0
 
             self.disable_kv_offload = config.disable_kv_offload
-            self.llamafile_kvargs = config.llamafile_kvargs
+            self.quantized_kv = config.quantized_kv
+            self.flash_attn = config.flash_attn
+            self.llamafile_server_kwargs = config.llamafile_server_kwargs
 
             self.metadata = {
                 "model_id": model,
@@ -209,16 +232,35 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             logging.error(f"Llamafile at {llamafile_path} is not executable")
             raise PermissionError(f"Llamafile at {llamafile_path} is not executable")
 
-        command = f"sh -c '{llamafile_path} --server --host 127.0.0.1 --port {self.port} -c {self.generation_params.get('context_length', 8192)} -ngl {self.generation_params.get('gpu_layers', 34)} --temp {self.generation_params.get('temperature', 0.1)} -n {self.generation_params.get('max_tokens', 1000)} --threads {self.generation_params.get('thread_count', os.cpu_count() or 1)} --nobrowser -b {self.generation_params.get('batch_size', 1)} --parallel {self.generation_params.get('max_concurrent_requests', 1)} --cont-batching'"
+        command = f"sh -c '{llamafile_path} --server --host 127.0.0.1 --port {self.port} " \
+                  f"-c {self.generation_params.get('context_size', 8192)} " \
+                  f"-ngl {self.generation_params.get('gpu_layers', 34)} " \
+                  f"--temp {self.generation_params['temperature']} " \
+                  f"-n {self.generation_params['max_new_tokens']} " \
+                  f"--threads {self.generation_params.get('thread_count', os.cpu_count() or 1)} " \
+                  f"--nobrowser -b {self.generation_params.get('batch_size', 32)} " \
+                  f"--parallel {self.generation_params.get('max_concurrent_requests', 1)} " \
+                  f"--cont-batching'"
 
-        if self.generation_params.get("disable_kv_offload", False):
+        if self.disable_kv_offload:
             command += " -nkvo"
             logging.info("KV offloading disabled")
 
-        extra_args = self.generation_params.get("llamafile_kvargs", "")
-        if extra_args:
-            command += f" {extra_args}"
-            logging.info(f"Additional arguments added: {extra_args}")
+        if self.quantized_kv:
+            command += " -ctk q4_0 -ctv q4_0"
+            logging.info("Quantized KV enabled")
+
+        if self.flash_attn:
+            command += " -fa"
+            logging.info("Flash Attention enabled")
+
+        if self.quantized_kv and not self.flash_attn:
+            raise LlamafileError("Quantized KV is enabled but Flash Attention is disabled. This configuration won't function.")
+
+        # Add any additional server arguments
+        for key, value in self.llamafile_server_kwargs.items():
+            command += f" --{key} {value}"
+            logging.info(f"Additional server argument added: --{key} {value}")
 
         logging.info(f"Starting llamafile server with command: {command}")
 
@@ -307,9 +349,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def _get_generation_params(self):
         return {
-            "max_tokens": self.generation_params.get("max_tokens", 1000),
-            "top_p": self.generation_params.get("top_p", 0.95),
-            "temperature": self.generation_params.get("temperature", 0.1),
+            "max_tokens": self.generation_params['max_new_tokens'],
+            "top_p": self.generation_params['top_p'],
+            "temperature": self.generation_params['temperature'],
             "stop": self.generation_params.get("stop", ["<|endoftext|>"]),
         }
 

@@ -54,7 +54,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(
         self,
-        model: str = None,
+        model_id: str = None,
         generation_params: Dict[str, Any] = None,
         quantized: bool = True,
         exec_async: bool = False,
@@ -70,24 +70,23 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         default_model_id = "flowaicom/Flow-Judge-v0.1"
 
-        if model is not None and model != default_model_id:
+        if model_id is not None and model_id != default_model_id:
             warnings.warn(
-                f"The model '{model}' is not officially supported. "
+                f"The model '{model_id}' is not officially supported. "
                 f"This library is designed for the '{default_model_id}' model. "
                 "Using other models may lead to unexpected behavior, and we do not handle "
                 "GitHub issues for unsupported models. Proceed with caution.",
                 UserWarning
             )
 
-        model = model or default_model_id
-        # Only append "-AWQ" if it's the default model and quantization is enabled
-        model_id = f"{model}-AWQ" if quantized and model == default_model_id else model
+        model_id = model_id or default_model_id
+        model_id = f"{model_id}-AWQ" if quantized and model_id == default_model_id else model_id
 
         generation_params = GenerationParams(**(generation_params or {}))
 
         config = VllmConfig(model_id=model_id, generation_params=generation_params, quantization=quantized, exec_async=exec_async, **kwargs)
 
-        super().__init__(model, "vllm", config.generation_params, **kwargs)
+        super().__init__(model_id, "vllm", config.generation_params, **kwargs)
 
         self.exec_async = exec_async
         self.generation_params = config.generation_params

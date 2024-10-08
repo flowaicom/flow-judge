@@ -60,7 +60,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for Llamafile supporting both sync and async operations.
 
     Args:
-        model (str, optional): The model ID to use. Defaults to "sariola/flow-judge-llamafile".
+        model_id (str, optional): The model ID to use. Defaults to "sariola/flow-judge-llamafile".
         generation_params (Dict[str, Any], optional): Generation parameters.
         cache_dir (str, optional): Directory to cache the model. Defaults to "~/.cache/flow-judge".
         port (int, optional): Port to run the Llamafile server on. Defaults to 8085.
@@ -73,7 +73,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(
         self,
-        model: str = None,
+        model_id: str = None,
         generation_params: Dict[str, Any] = None,
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
@@ -94,21 +94,21 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         default_model_id = "sariola/flow-judge-llamafile"
 
-        if model is not None and model != default_model_id:
+        if model_id is not None and model_id != default_model_id:
             warnings.warn(
-                f"The model '{model}' is not officially supported. "
+                f"The model '{model_id}' is not officially supported. "
                 f"This library is designed for the '{default_model_id}' model. "
                 "Using other models may lead to unexpected behavior, and we do not handle "
                 "GitHub issues for unsupported models. Proceed with caution.",
                 UserWarning
             )
 
-        model = model or default_model_id
+        model_id = model_id or default_model_id
 
         generation_params = GenerationParams(**(generation_params or {}))
 
         config = LlamafileConfig(
-            model_id=model,
+            model_id=model_id,
             generation_params=generation_params,
             model_filename="flow-judge.llamafile",
             cache_dir=cache_dir,
@@ -120,7 +120,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             **kwargs,
         )
 
-        super().__init__(model, "llamafile", config.generation_params, **kwargs)
+        super().__init__(model_id, "llamafile", config.generation_params, **kwargs)
 
         try:
             self.generation_params = config.generation_params
@@ -147,7 +147,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             self.llamafile_server_kwargs = config.llamafile_server_kwargs
 
             self.metadata = {
-                "model_id": model,
+                "model_id": model_id,
                 "model_type": "llamafile",
             }
 

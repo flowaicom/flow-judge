@@ -107,7 +107,7 @@ class Hf(BaseFlowJudgeModel):
 
             if self.device == "cpu":
                 logger.warning(
-                    "Running the FlowJudgeHFModel on CPU may result in longer inference times."
+                    "Running Hf on CPU may result in longer inference times."
                 )
 
             self.batch_size = 1  # Default to 1, will be updated in batch_generate

@@ -34,7 +34,7 @@ def write_results_to_disk(
     os.makedirs(metadata_folder, exist_ok=True)
 
     base_filename = f"{fmt_metric_name}_{fmt_model_id}_{model_metadata['model_type']}_{timestamp}"
-    metadata_path = os.path.join(metadata_folder, f"metadata_{base_filename}.jsonl")
+    metadata_path = os.path.join(metadata_folder, f"metadata_{base_filename}.json")
     results_path = os.path.join(metric_folder, f"results_{base_filename}.jsonl")
 
     # Write metadata file

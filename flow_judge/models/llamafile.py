@@ -26,7 +26,7 @@ except ImportError:
     LLAMAFILE_AVAILABLE = False
 
 LLAMAFILE_URL = (
-    "https://huggingface.co/sariola/flow-judge-llamafile/resolve/main/flow-judge.llamafile"
+    "https://huggingface.co/flowaicom/Flow-Judge-v0.1-Llamafile/resolve/main/flow-judge.llamafile"
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for Llamafile supporting both sync and async operations.
 
     Args:
-        model_id (str, optional): The model ID to use. Defaults to "sariola/flow-judge-llamafile".
+        model_id (str, optional): The model ID to use. Defaults to "flowaicom/Flow-Judge-v0.1-Llamafile".
         generation_params (Dict[str, Any], optional): Generation parameters.
         cache_dir (str, optional): Directory to cache the model. Defaults to "~/.cache/flow-judge".
         port (int, optional): Port to run the Llamafile server on. Defaults to 8085.
@@ -89,10 +89,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 status_code=1,
                 message="The required Llamafile packages are not installed. "
                 "Please install them by adding 'llamafile' to your extras:\n"
-                "pip install flow-judge[...,llamafile]",
+                "pip install flow-judge[llamafile]",
             )
 
-        default_model_id = "sariola/flow-judge-llamafile"
+        default_model_id = "flowaicom/Flow-Judge-v0.1-Llamafile"
 
         if model_id is not None and model_id != default_model_id:
             warnings.warn(
@@ -156,7 +156,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 status_code=2,
                 message=f"An error occurred while initializing the Llamafile model: {str(e)}\n"
                 "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
-                "pip install flow-judge[...,llamafile]",
+                "pip install flow-judge[llamafile]",
             ) from e
 
     def is_server_running(self):

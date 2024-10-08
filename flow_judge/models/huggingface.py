@@ -52,7 +52,7 @@ class Hf(BaseFlowJudgeModel):
                 status_code=1,
                 message="The required Hugging Face packages are not installed. "
                 "Please install them by adding 'hf' to your extras:\n"
-                "pip install flow-judge[...,hf]",
+                "pip install flow-judge[hf]",
             )
 
         default_model_id = "flowaicom/Flow-Judge-v0.1"
@@ -117,7 +117,7 @@ class Hf(BaseFlowJudgeModel):
                 status_code=2,
                 message=f"An error occurred while initializing the Hugging Face model: {str(e)}\n"
                 "Please make sure you have installed all required dependencies by adding 'hf' to your extras:\n"
-                "pip install flow-judge[...,hf]",
+                "pip install flow-judge[hf]",
             ) from e
 
     def _determine_batch_size(self, prompts: List[str]) -> int:

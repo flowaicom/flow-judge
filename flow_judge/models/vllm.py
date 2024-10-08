@@ -65,7 +65,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             raise VllmError(
                 status_code=1,
                 message="The 'vllm' package is not installed. Please install it by adding 'vllm' to your extras:\n"
-                "pip install flow-judge[...,vllm]",
+                "pip install flow-judge[vllm]",
             )
 
         default_model_id = "flowaicom/Flow-Judge-v0.1"

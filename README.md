@@ -19,7 +19,7 @@
 
 <p align="center">
 <a href="https://github.com/flowaicom/flow-judge/stargazers/" target="_blank">
-    <img src="https://img.shields.io/github/stars/flowaicom/flow-judge?style=social&label=Star&maxAge=2592000" alt="GitHub stars">
+    <img src="https://img.shields.io/github/stars/flowaicom/flow-judge?style=social&label=Star&maxAge=3600" alt="GitHub stars">
 </a>
 <a href="https://github.com/flowaicom/flow-judge/releases" target="_blank">
     <img src="https://img.shields.io/github/v/release/flowaicom/flow-judge?color=white" alt="Release">

@@ -272,6 +272,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                   f"-c {self.generation_params.get('context_size', 8192)} " \
                   f"-ngl {self.generation_params.get('gpu_layers', 34)} " \
                   f"--temp {self.generation_params['temperature']} " \
+                  f"--top-p {self.generation_params['top_p']} " \
                   f"-n {self.generation_params['max_new_tokens']} " \
                   f"--threads {self.generation_params.get('thread_count', os.cpu_count() or 1)} " \
                   f"--nobrowser -b {self.generation_params.get('batch_size', 32)} " \

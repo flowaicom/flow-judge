@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -63,6 +63,15 @@ class GenerationParams(BaseModel):
     top_p: float = 0.95
     max_new_tokens: int = 1000
     do_sample: bool = True
+
+class VllmGenerationParams(GenerationParams):
+    max_tokens: Optional[int] = None
+    stop_token_ids: List[int] = [32007,32001,32000]
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.max_tokens = self.max_new_tokens
+        del self.max_new_tokens
+        del self.do_sample
 
 
 class ModelType(Enum):

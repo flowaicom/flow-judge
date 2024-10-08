@@ -6,7 +6,7 @@ from flow_judge.models.common import (
     BaseFlowJudgeModel,
     ModelConfig,
     ModelType,
-    GenerationParams,
+    VllmGenerationParams,
 )
 
 import warnings
@@ -24,11 +24,11 @@ class VllmConfig(ModelConfig):
     def __init__(
         self,
         model_id: str,
-        generation_params: GenerationParams,
+        generation_params: VllmGenerationParams,
         max_model_len: int = 8192,
         trust_remote_code: bool = True,
         enforce_eager: bool = True,
-        dtype: str = "bfloat16",
+        dtype: str = "auto",
         disable_sliding_window: bool = True,
         gpu_memory_utilization: float = 0.90,
         max_num_seqs: int = 256,
@@ -82,7 +82,12 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         model_id = model_id or default_model_id
         model_id = f"{model_id}-AWQ" if quantized and model_id == default_model_id else model_id
 
-        generation_params = GenerationParams(**(generation_params or {}))
+        generation_params = VllmGenerationParams(**(generation_params or {}))
+
+        # Translate max_new_tokens to max_tokens for vLLM
+        if 'max_new_tokens' in generation_params.model_dump():
+            generation_params.max_tokens = generation_params.max_new_tokens
+            del generation_params.max_new_tokens
 
         config = VllmConfig(model_id=model_id, generation_params=generation_params, quantization=quantized, exec_async=exec_async, **kwargs)
 

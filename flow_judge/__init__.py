@@ -28,7 +28,7 @@ __all__ = [
 
 # Conditional imports for optional dependencies
 try:
-    from flow_judge.models.hf import Hf
+    from flow_judge.models.huggingface import Hf
     __all__.append("Hf")
 except ImportError:
     Hf = None

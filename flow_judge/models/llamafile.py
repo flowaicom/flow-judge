@@ -5,6 +5,9 @@ import shlex
 import subprocess
 import threading
 import time
+import weakref
+import atexit
+import signal
 from typing import Any, Dict, List
 
 import requests
@@ -56,6 +59,20 @@ class LlamafileConfig(ModelConfig):
         self.llamafile_server_kwargs = llamafile_server_kwargs or {}
 
 
+def cleanup_llamafile(process_ref):
+    process = process_ref()
+    if process:
+        try:
+            pgid = os.getpgid(process.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except (subprocess.TimeoutExpired, ProcessLookupError):
+            try:
+                os.killpg(pgid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge model class for Llamafile supporting both sync and async operations.
 
@@ -71,12 +88,21 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         **kwargs: Additional keyword arguments.
     """
 
+    _instances = set()
+    _next_port = 8085
+
+    @classmethod
+    def _get_next_port(cls):
+        port = cls._next_port
+        cls._next_port += 1
+        return port
+
     def __init__(
         self,
         model_id: str = None,
         generation_params: Dict[str, Any] = None,
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
-        port: int = 8085,
+        port: int = None,
         disable_kv_offload: bool = False,
         quantized_kv: bool = True,
         flash_attn: bool = True,
@@ -106,6 +132,9 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         model_id = model_id or default_model_id
 
         generation_params = GenerationParams(**(generation_params or {}))
+
+        if port is None:
+            port = self._get_next_port()
 
         config = LlamafileConfig(
             model_id=model_id,
@@ -158,6 +187,13 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
                 "pip install flow-judge[llamafile]",
             ) from e
+
+        self._instances.add(weakref.ref(self, self._finalizer))
+        atexit.register(self.cleanup)
+
+    @classmethod
+    def _finalizer(cls, ref):
+        cls._instances.discard(ref)
 
     def is_server_running(self):
         try:
@@ -278,8 +314,12 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 bufsize=1,
                 universal_newlines=True,
                 text=True,
+                preexec_fn=os.setsid
             )
             logging.info(f"Subprocess started with PID: {self.llamafile_process.pid}")
+
+            # Register cleanup function for this specific process
+            atexit.register(cleanup_llamafile, weakref.ref(self.llamafile_process))
 
             # Start threads to log stdout and stderr in real-time
             threading.Thread(
@@ -326,10 +366,21 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def stop_llamafile_server(self):
         if self.llamafile_process:
-            self.llamafile_process.terminate()
-            time.sleep(1)
-            self.llamafile_process.kill()
+            cleanup_llamafile(weakref.ref(self.llamafile_process))
             self.llamafile_process = None
+
+    def cleanup(self):
+        self.stop_llamafile_server()
+
+    def __del__(self):
+        try:
+            self.cleanup()
+        except (ProcessLookupError, OSError) as e:
+            # These exceptions might occur if the process is already terminated
+            logging.warning(f"Error during cleanup in __del__: {str(e)}")
+        except Exception as e:
+            # Log unexpected exceptions, but don't raise them as __del__ should not raise exceptions
+            logging.error(f"Unexpected error during cleanup in __del__: {str(e)}")
 
     def _generate(self, prompt: str) -> str:
         self._ensure_server_running()
@@ -397,12 +448,16 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             self.stop_llamafile_server()
             self._server_running = False
 
-    def __del__(self):
-        try:
-            if hasattr(self, "_server_running") and self._server_running:
-                self.stop_llamafile_server()
-        except:
-            pass  # Ignore any errors during deletion
+    @classmethod
+    def cleanup_all(cls):
+        for instance_ref in list(cls._instances):
+            instance = instance_ref()
+            if instance is not None:
+                instance.cleanup()
+
+
+# Register cleanup_all at the module level
+atexit.register(Llamafile.cleanup_all)
 
 
 class LlamafileError(Exception):

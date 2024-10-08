@@ -231,7 +231,7 @@ for i, result in enumerate(results):
 ## Advanced Usage
 
 > [!WARNING]
-> There is a reported issue with Phi-3 models that produces gibberish outputs with contexts longer than 4096 tokens, including input and output. This issue has been recently fixed in the transformers library so we recommend using the `Flow-Judge-v0.1_HF` model configuration for longer contexts at the moment. For more details, refer to: [#33129](https://github.com/huggingface/transformers/pull/33129) and [#6135](https://github.com/vllm-project/vllm/issues/6135)
+> There exists currently a reported issue with Phi-3 models that produces gibberish outputs with contexts longer than 4096 tokens, including input and output. This issue has been recently fixed in the transformers library so we recommend using the `Hf()` model configuration for longer contexts at the moment. For more details, refer to: [#33129](https://github.com/huggingface/transformers/pull/33129) and [#6135](https://github.com/vllm-project/vllm/issues/6135)
 
 
 ### Custom Metrics

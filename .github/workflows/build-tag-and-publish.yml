@@ -1,0 +1,125 @@
+name: Build, tag and publish to PyPI and TestPyPI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - name: Install pypa/build
+      run: python3 -m pip install build --user
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+  publish-to-testpypi:
+    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    needs: [build]
+    runs-on: self-hosted
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/flow-judge
+
+    permissions:
+      id-token: write
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        user: __token__
+        password: ${{ secrets.TESTPYPI_API_TOKEN }}
+
+  publish-to-pypi:
+    name: Publish Python 🐍 distribution 📦 to PyPI
+    needs: [publish-to-testpypi]
+    runs-on: self-hosted
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/flow-judge
+    permissions:
+      id-token: write
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Verify tag format
+      run: |
+        if [[ ! "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Invalid tag format. Expected format: v*.*.*"
+          exit 1
+        fi
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
+
+  github-release:
+    name: Create GitHub Release
+    needs: [publish-to-pypi]
+    runs-on: self-hosted
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Sign the dists with Sigstore
+      uses: sigstore/gh-action-sigstore-python@v2.1.1
+      with:
+        inputs: ./dist/*.tar.gz ./dist/*.whl
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "${{ github.ref_name }}" \
+          --repo "${{ github.repository }}" \
+          --title "Release ${{ github.ref_name }}" \
+          --notes "Release notes for version ${{ github.ref_name }}"
+    - name: Upload artifact signatures to GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: gh release upload "${{ github.ref_name }}" dist/** --repo "${{ github.repository }}"

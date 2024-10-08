@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -56,7 +56,7 @@ llamafile = [
 Homepage = "https://github.com/flowaicom/flow-judge"
 
 [tool.setuptools]
-packages = ["flow_judge"]
+packages = ["flow_judge", "flow_judge.integrations", "flow_judge.metrics", "flow_judge.models", "flow_judge.utils"]
 
 [tool.setuptools_scm]
 version_scheme = "python-simplified-semver"
@@ -81,3 +81,6 @@ target-version = ['py310']
 [tool.isort]
 profile = "black"
 line_length = 100
+
+[tool.bdist_wheel]
+universal = true

@@ -19,7 +19,6 @@ from flow_judge.models.common import (
 
 try:
     from openai import AsyncOpenAI, OpenAI
-
     LLAMAFILE_AVAILABLE = True
 except ImportError:
     LLAMAFILE_AVAILABLE = False

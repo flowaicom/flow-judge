@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
+from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType
+
 try:
     import torch
     from huggingface_hub import snapshot_download
@@ -14,8 +16,6 @@ except ImportError:
     HF_AVAILABLE = False
 
 from tqdm import tqdm
-
-from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType
 
 logger = logging.getLogger(__name__)
 

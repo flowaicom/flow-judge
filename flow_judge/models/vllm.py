@@ -1,9 +1,6 @@
 import asyncio
 from typing import Any, Dict
 
-import torch
-from transformers import AutoTokenizer
-
 from flow_judge.models.common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
@@ -12,8 +9,9 @@ from flow_judge.models.common import (
 )
 
 try:
+    import torch
+    from transformers import AutoTokenizer
     from vllm import LLM, AsyncEngineArgs, AsyncLLMEngine, SamplingParams
-
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False

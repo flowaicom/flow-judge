@@ -42,6 +42,8 @@ dev = [
     "mypy>=1.11.2",
     "types-requests",
     "types-tqdm",
+    "memray>=1.14.0",
+    "pytest-memray>=1.7.0",
 ]
 hf = [
     "transformers>=4.45.0",
@@ -100,3 +102,8 @@ disallow_incomplete_defs = false
 
 [tool.bdist_wheel]
 universal = true
+
+[tool.pytest.ini_options]
+markers = [
+    "memray: marks tests to be run with memray profiling"
+]

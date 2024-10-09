@@ -9,7 +9,6 @@ import pytest
 from llama_index.core import VectorStoreIndex
 from llama_index.core.evaluation import BatchEvalRunner
 from llama_index.core.llama_dataset import download_llama_dataset
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 from flow_judge.integrations.llama_index import LlamaIndexFlowJudge
 from flow_judge.metrics import CustomMetric, RubricItem
@@ -310,8 +309,7 @@ async def test_batch_evaluation(correctness_metric, query, reference, test_cache
     )
 
     # Create the index and query engine
-    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-    index = VectorStoreIndex.from_documents(documents=documents, embed_model=embed_model)
+    index = VectorStoreIndex.from_documents(documents=documents)  # FIXME: depends on OpenAI
     query_engine = index.as_query_engine()  # FIXME: depends on OpenAI
 
     # Prepare queries and references

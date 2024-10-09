@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BaseFlowJudgeModel(ABC):
@@ -58,16 +58,50 @@ class AsyncBaseFlowJudgeModel(ABC):
         """Generate responses for multiple prompts asynchronously."""
         pass
 
+
 class GenerationParams(BaseModel):
+    """Configuration parameters for text generation."""
+
     temperature: float = 0.1
     top_p: float = 0.95
     max_new_tokens: int = 1000
     do_sample: bool = True
 
-class VllmGenerationParams(GenerationParams):
-    max_tokens: Optional[int] = None
-    stop_token_ids: List[int] = [32007,32001,32000]
+
+class LlamafileGenerationParams(GenerationParams):
+    """Configuration parameters specific to Llamafile text generation."""
+
+    context_size: int = Field(default=8192, description="Context size for the model")
+    gpu_layers: int = Field(default=34, description="Number of GPU layers to use")
+    thread_count: int = Field(default=None, description="Number of threads to use")
+    batch_size: int = Field(default=32, description="Batch size for generation")
+    max_concurrent_requests: int = Field(
+        default=1, description="Maximum number of concurrent requests"
+    )
+
     def __init__(self, **data):
+        """Initialize LlamafileGenerationParams with given data.
+
+        :param data: Keyword arguments to initialize the parameters.
+        """
+        super().__init__(**data)
+        if self.thread_count is None:
+            import os
+
+            self.thread_count = os.cpu_count() or 1
+
+
+class VllmGenerationParams(GenerationParams):
+    """Configuration parameters specific to VLLM text generation."""
+
+    max_tokens: int | None = None
+    stop_token_ids: list[int] = [32007, 32001, 32000]
+
+    def __init__(self, **data):
+        """Initialize VllmGenerationParams with given data.
+
+        :param data: Keyword arguments to initialize the parameters.
+        """
         super().__init__(**data)
         self.max_tokens = self.max_new_tokens
         del self.max_new_tokens
@@ -84,6 +118,8 @@ class ModelType(Enum):
 
 
 class Engine(Enum):
+    """Enum for the type of engine used for text generation."""
+
     VLLM = "vllm"
     VLLM_ASYNC = "vllm_async"
     HF = "hf"  # HF stands for Hugging Face (Transformers)
@@ -97,9 +133,16 @@ class ModelConfig:
         self,
         model_id: str,
         model_type: ModelType,
-        generation_params: Dict[str, Any],
+        generation_params: dict[str, Any],
         **kwargs: Any,
     ):
+        """Initialize ModelConfig with model details and generation parameters.
+
+        :param model_id: Identifier for the model.
+        :param model_type: Type of the model.
+        :param generation_params: Parameters for text generation.
+        :param kwargs: Additional keyword arguments.
+        """
         self.model_id = model_id
         self.model_type = model_type
         self.generation_params = generation_params

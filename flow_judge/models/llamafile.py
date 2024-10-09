@@ -1,65 +1,102 @@
 import asyncio
+import atexit
 import logging
 import os
 import shlex
+import signal
 import subprocess
 import threading
 import time
+import warnings
 import weakref
-import atexit
-import signal
-from typing import Any, Dict, List
+from typing import Any
 
 import requests
 from tqdm import tqdm
-import warnings
 
 from flow_judge.models.common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
+    LlamafileGenerationParams,
     ModelConfig,
     ModelType,
-    GenerationParams,
 )
 
 try:
     from openai import AsyncOpenAI, OpenAI
+
     LLAMAFILE_AVAILABLE = True
 except ImportError:
     LLAMAFILE_AVAILABLE = False
 
 LLAMAFILE_URL = (
-    "https://huggingface.co/flowaicom/Flow-Judge-v0.1-Llamafile/resolve/main/flow-judge.llamafile"
+    "https://huggingface.co/flowaicom/Flow-Judge-v0.1-Llamafile/resolve/main/"
+    "flow-judge.llamafile"
 )
 
 logger = logging.getLogger(__name__)
 
 
 class LlamafileConfig(ModelConfig):
+    """Configuration class for Llamafile models.
+
+    Extends the base ModelConfig with Llamafile specific parameters.
+    """
+
     def __init__(
         self,
-        model_id: str,
-        generation_params: GenerationParams,
+        generation_params: LlamafileGenerationParams,
         model_filename: str = "flow-judge.llamafile",
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
         disable_kv_offload: bool = False,
         quantized_kv: bool = True,
         flash_attn: bool = True,
-        llamafile_server_kwargs: Dict[str, Any] = None,
+        context_size: int = 8192,
+        gpu_layers: int = 34,
+        thread_count: int = None,
+        batch_size: int = 32,
+        max_concurrent_requests: int = 1,
+        llamafile_server_kwargs: dict[str, Any] = None,
         **kwargs: Any,
     ):
-        super().__init__(model_id, ModelType.LLAMAFILE, generation_params.model_dump(), **kwargs)
+        """Initialize LlamafileConfig with model details and Llamafile specific parameters.
+
+        :param generation_params: Parameters for text generation.
+        :param model_filename: Name of the Llamafile model file.
+        :param cache_dir: Directory to cache the model.
+        :param port: Port to run the Llamafile server on.
+        :param disable_kv_offload: Whether to disable KV offloading.
+        :param quantized_kv: Whether to enable Quantized KV.
+        :param flash_attn: Whether to enable Flash Attention.
+        :param context_size: Size of the context window.
+        :param gpu_layers: Number of GPU layers to use.
+        :param thread_count: Number of threads to use. If None, uses the number of CPU cores.
+        :param batch_size: Batch size for processing.
+        :param max_concurrent_requests: Maximum number of concurrent requests.
+        :param llamafile_server_kwargs: Additional keyword arguments for the Llamafile server.
+        :param kwargs: Additional keyword arguments.
+        """
+        super().__init__(ModelType.LLAMAFILE, generation_params.model_dump(), **kwargs)
         self.model_filename = model_filename
         self.cache_dir = cache_dir
         self.port = port
         self.disable_kv_offload = disable_kv_offload
         self.quantized_kv = quantized_kv
         self.flash_attn = flash_attn
+        self.context_size = context_size
+        self.gpu_layers = gpu_layers
+        self.thread_count = thread_count
+        self.batch_size = batch_size
+        self.max_concurrent_requests = max_concurrent_requests
         self.llamafile_server_kwargs = llamafile_server_kwargs or {}
 
 
 def cleanup_llamafile(process_ref):
+    """Clean up the Llamafile process.
+
+    :param process_ref: Weak reference to the Llamafile process.
+    """
     process = process_ref()
     if process:
         try:
@@ -74,22 +111,12 @@ def cleanup_llamafile(process_ref):
 
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
-    """Combined FlowJudge model class for Llamafile supporting both sync and async operations.
-
-    Args:
-        model_id (str, optional): The model ID to use. Defaults to "flowaicom/Flow-Judge-v0.1-Llamafile".
-        generation_params (Dict[str, Any], optional): Generation parameters.
-        cache_dir (str, optional): Directory to cache the model. Defaults to "~/.cache/flow-judge".
-        port (int, optional): Port to run the Llamafile server on. Defaults to 8085.
-        disable_kv_offload (bool, optional): Whether to disable KV offloading. Defaults to False.
-        quantized_kv (bool, optional): Whether to enable Quantized KV. Defaults to True.
-        flash_attn (bool, optional): Whether to enable Flash Attention. Defaults to True.
-        llamafile_server_kwargs (Dict[str, Any], optional): Additional keyword arguments for the Llamafile server.
-        **kwargs: Additional keyword arguments.
-    """
+    """Combined FlowJudge model class for Llamafile supporting both sync and async operations."""
 
     _instances = set()
     _next_port = 8085
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1-Llamafile"
+    _MODEL_TYPE = "llamafile"
 
     @classmethod
     def _get_next_port(cls):
@@ -99,17 +126,51 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(
         self,
-        model_id: str = None,
-        generation_params: Dict[str, Any] = None,
+        generation_params: dict[str, Any] = None,
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = None,
         disable_kv_offload: bool = False,
         quantized_kv: bool = True,
         flash_attn: bool = True,
-        llamafile_server_kwargs: Dict[str, Any] = None,
+        context_size: int = 8192,
+        gpu_layers: int = 34,
+        thread_count: int = None,
+        batch_size: int = 32,
+        max_concurrent_requests: int = 1,
+        llamafile_server_kwargs: dict[str, Any] = None,
         **kwargs: Any,
     ):
-        """Initialize the FlowJudge Llamafile model."""
+        """Initialize the FlowJudge Llamafile model.
+
+        :param model_id: Identifier for the model. If None, uses the default model.
+        :param generation_params: Dictionary of parameters for text generation. Can include:
+            - temperature: float (default: 0.1)
+            - top_p: float (default: 0.95)
+            - max_new_tokens: int (default: 1000)
+            - do_sample: bool (default: True)
+        :param cache_dir: Directory to cache the model files.
+        :param port: Port to run the Llamafile server on. If None, assigns automatically.
+        :param disable_kv_offload: Whether to disable KV offloading.
+        :param quantized_kv: Whether to enable Quantized KV.
+        :param flash_attn: Whether to enable Flash Attention.
+        :param context_size: Size of the context window.
+        :param gpu_layers: Number of GPU layers to use.
+        :param thread_count: Number of threads to use. If None, uses the number of CPU cores.
+        :param batch_size: Batch size for processing.
+        :param max_concurrent_requests: Maximum number of concurrent requests.
+        :param llamafile_server_kwargs: Additional keyword arguments for the Llamafile server.
+        :param kwargs: Additional keyword arguments.
+
+        Note:
+        Continuous batching is enabled by default.
+
+        For more information about these arguments and their effects, please refer to the
+        Llamafile documentation:
+        https://github.com/Mozilla-Ocho/llamafile/blob/main/llama.cpp/server/README.md
+
+        :raises LlamafileError: If required Llamafile packages are not installed or
+            initialization fails.
+        """
         if not LLAMAFILE_AVAILABLE:
             raise LlamafileError(
                 status_code=1,
@@ -118,26 +179,28 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "pip install flow-judge[llamafile]",
             )
 
-        default_model_id = "flowaicom/Flow-Judge-v0.1-Llamafile"
+        # Allow internal override of model_id for debugging/development
+        model_id = kwargs.pop("_model_id", None) or self._DEFAULT_MODEL_ID
 
-        if model_id is not None and model_id != default_model_id:
+        if model_id != self._DEFAULT_MODEL_ID:
             warnings.warn(
                 f"The model '{model_id}' is not officially supported. "
-                f"This library is designed for the '{default_model_id}' model. "
+                f"This library is designed for the '{self._DEFAULT_MODEL_ID}' model. "
                 "Using other models may lead to unexpected behavior, and we do not handle "
                 "GitHub issues for unsupported models. Proceed with caution.",
-                UserWarning
+                UserWarning,
+                stacklevel=2,
             )
 
-        model_id = model_id or default_model_id
-
-        generation_params = GenerationParams(**(generation_params or {}))
+        generation_params = LlamafileGenerationParams(**(generation_params or {}))
 
         if port is None:
             port = self._get_next_port()
 
+        if thread_count is None:
+            thread_count = os.cpu_count()
+
         config = LlamafileConfig(
-            model_id=model_id,
             generation_params=generation_params,
             model_filename="flow-judge.llamafile",
             cache_dir=cache_dir,
@@ -145,11 +208,22 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             disable_kv_offload=disable_kv_offload,
             quantized_kv=quantized_kv,
             flash_attn=flash_attn,
+            context_size=context_size,
+            gpu_layers=gpu_layers,
+            thread_count=thread_count,
+            batch_size=batch_size,
+            max_concurrent_requests=max_concurrent_requests,
             llamafile_server_kwargs=llamafile_server_kwargs,
             **kwargs,
         )
 
-        super().__init__(model_id, "llamafile", config.generation_params, **kwargs)
+        # Call both parent class initializers
+        BaseFlowJudgeModel.__init__(
+            self, model_id, self._MODEL_TYPE, config.generation_params, **kwargs
+        )
+        AsyncBaseFlowJudgeModel.__init__(
+            self, model_id, self._MODEL_TYPE, config.generation_params, **kwargs
+        )
 
         try:
             self.generation_params = config.generation_params
@@ -184,7 +258,8 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             raise LlamafileError(
                 status_code=2,
                 message=f"An error occurred while initializing the Llamafile model: {str(e)}\n"
-                "Please make sure you have installed all required dependencies by adding 'llamafile' to your extras:\n"
+                "Please make sure you have installed all required dependencies"
+                " by adding 'llamafile' to your extras:\n"
                 "pip install flow-judge[llamafile]",
             ) from e
 
@@ -196,6 +271,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         cls._instances.discard(ref)
 
     def is_server_running(self):
+        """Check if the Llamafile server is running.
+
+        :return: True if the server is running, False otherwise.
+        """
         try:
             self.sync_client.models.list()
             return True
@@ -203,6 +282,11 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             return False
 
     def download_llamafile(self):
+        """Download the Llamafile model.
+
+        :return: Path to the downloaded Llamafile.
+        :raises DownloadError: If the download fails.
+        """
         local_dir = self.cache_dir
         os.makedirs(local_dir, exist_ok=True)
         llamafile_path = os.path.abspath(os.path.join(local_dir, self.model_filename))
@@ -216,16 +300,13 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 total_size = int(response.headers.get("content-length", 0))
                 block_size = 8192
 
-                with (
-                    open(llamafile_path, "wb") as file,
-                    tqdm(
-                        desc="Downloading",
-                        total=total_size,
-                        unit="iB",
-                        unit_scale=True,
-                        unit_divisor=1024,
-                    ) as progress_bar,
-                ):
+                with open(llamafile_path, "wb") as file, tqdm(
+                    desc="Downloading",
+                    total=total_size,
+                    unit="iB",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as progress_bar:
                     for data in response.iter_content(block_size):
                         size = file.write(data)
                         progress_bar.update(size)
@@ -234,20 +315,20 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 logging.error(f"Error downloading llamafile: {str(e)}")
                 if os.path.exists(llamafile_path):
                     os.remove(llamafile_path)
-                raise DownloadError(f"Failed to download llamafile: {str(e)}")
+                raise DownloadError(f"Failed to download llamafile: {str(e)}") from e
 
             except Exception as e:
                 logging.error(f"Unexpected error during download: {str(e)}")
                 if os.path.exists(llamafile_path):
                     os.remove(llamafile_path)
-                raise DownloadError(f"Unexpected error during download: {str(e)}")
+                raise DownloadError(f"Unexpected error during download: {str(e)}") from e
 
         try:
             os.chmod(llamafile_path, 0o755)
             logging.debug(f"Set executable permissions for {llamafile_path}")
         except OSError as e:
             logging.error(f"Failed to set executable permissions: {str(e)}")
-            raise DownloadError(f"Failed to set executable permissions: {str(e)}")
+            raise DownloadError(f"Failed to set executable permissions: {str(e)}") from e
 
         if not os.path.exists(llamafile_path):
             raise DownloadError("Llamafile not found after download attempt")
@@ -255,6 +336,12 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         return llamafile_path
 
     def start_llamafile_server(self):
+        """Start the Llamafile server.
+
+        :raises FileNotFoundError: If the Llamafile is not found.
+        :raises PermissionError: If the Llamafile is not executable.
+        :raises RuntimeError: If the server fails to start within the timeout period.
+        """
         logging.info("Starting llamafile server...")
         llamafile_path = self.download_llamafile()
         logging.info(f"Llamafile path: {llamafile_path}")
@@ -263,21 +350,36 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             logging.error(f"Llamafile not found at {llamafile_path}")
             raise FileNotFoundError(f"Llamafile not found at {llamafile_path}")
 
-        # Check if the file is executable
         if not os.access(llamafile_path, os.X_OK):
             logging.error(f"Llamafile at {llamafile_path} is not executable")
             raise PermissionError(f"Llamafile at {llamafile_path} is not executable")
 
-        command = f"sh -c '{llamafile_path} --server --host 127.0.0.1 --port {self.port} " \
-                  f"-c {self.generation_params.get('context_size', 8192)} " \
-                  f"-ngl {self.generation_params.get('gpu_layers', 34)} " \
-                  f"--temp {self.generation_params['temperature']} " \
-                  f"--top-p {self.generation_params['top_p']} " \
-                  f"-n {self.generation_params['max_new_tokens']} " \
-                  f"--threads {self.generation_params.get('thread_count', os.cpu_count() or 1)} " \
-                  f"--nobrowser -b {self.generation_params.get('batch_size', 32)} " \
-                  f"--parallel {self.generation_params.get('max_concurrent_requests', 1)} " \
-                  f"--cont-batching"
+        command = self._build_llamafile_command(llamafile_path)
+        logging.info(f"Starting llamafile server with command: {command}")
+
+        try:
+            self.llamafile_process = self._start_llamafile_process(command)
+            self._wait_for_server_start()
+        except Exception as e:
+            logging.exception(f"Error starting llamafile server: {str(e)}")
+            if self.llamafile_process:
+                logging.info("Terminating llamafile process due to startup error")
+                self.llamafile_process.terminate()
+            raise
+
+    def _build_llamafile_command(self, llamafile_path):
+        command = (
+            f"sh -c '{llamafile_path} --server --host 127.0.0.1 --port {self.port} "
+            f"-c {self.config.context_size} "
+            f"-ngl {self.config.gpu_layers} "
+            f"--temp {self.generation_params.temperature} "
+            f"--top-p {self.generation_params.top_p} "
+            f"-n {self.generation_params.max_new_tokens} "
+            f"--threads {self.config.thread_count} "
+            f"--nobrowser -b {self.config.batch_size} "
+            f"--parallel {self.config.max_concurrent_requests} "
+            f"--cont-batching"
+        )
 
         if self.disable_kv_offload:
             command += " -nkvo"
@@ -292,7 +394,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             logging.info("Flash Attention enabled")
 
         if self.quantized_kv and not self.flash_attn:
-            raise LlamafileError("Quantized KV is enabled but Flash Attention is disabled. This configuration won't function.")
+            raise LlamafileError(
+                "Quantized KV is enabled but Flash Attention is disabled."
+                " This configuration won't function."
+            )
 
         # Add any additional server arguments
         for key, value in self.llamafile_server_kwargs.items():
@@ -300,80 +405,80 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             logging.info(f"Additional server argument added: --{key} {value}")
 
         command += "'"
+        return command
 
-        logging.info(f"Starting llamafile server with command: {command}")
-
+    def _start_llamafile_process(self, command):
         def log_output(pipe, log_func):
             for line in iter(pipe.readline, ""):
                 log_func(line.strip())
 
-        try:
-            self.llamafile_process = subprocess.Popen(
-                shlex.split(command),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=1,
-                universal_newlines=True,
-                text=True,
-                preexec_fn=os.setsid
+        process = subprocess.Popen(
+            shlex.split(command),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,
+            universal_newlines=True,
+            text=True,
+            preexec_fn=os.setsid,
+        )
+        logging.info(f"Subprocess started with PID: {process.pid}")
+
+        # Register cleanup function for this specific process
+        atexit.register(cleanup_llamafile, weakref.ref(process))
+
+        # Start threads to log stdout and stderr in real-time
+        threading.Thread(
+            target=log_output, args=(process.stdout, logging.info), daemon=True
+        ).start()
+        threading.Thread(
+            target=log_output, args=(process.stderr, logging.info), daemon=True
+        ).start()
+
+        return process
+
+    def _wait_for_server_start(self):
+        # Wait for the server to start or timeout after 60 seconds
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            if self.is_server_running():
+                logging.info("Llamafile server started successfully")
+                return  # Exit the method, keeping the server running
+            time.sleep(1)
+            logging.debug(
+                f"Waiting for server to start... " f"(Elapsed: {time.time() - start_time:.2f}s)"
             )
-            logging.info(f"Subprocess started with PID: {self.llamafile_process.pid}")
 
-            # Register cleanup function for this specific process
-            atexit.register(cleanup_llamafile, weakref.ref(self.llamafile_process))
-
-            # Start threads to log stdout and stderr in real-time
-            threading.Thread(
-                target=log_output, args=(self.llamafile_process.stdout, logging.info), daemon=True
-            ).start()
-            threading.Thread(
-                target=log_output, args=(self.llamafile_process.stderr, logging.info), daemon=True
-            ).start()
-
-            # Wait for the server to start or timeout after 60 seconds
-            start_time = time.time()
-            while time.time() - start_time < 60:
-                if self.is_server_running():
-                    logging.info("Llamafile server started successfully")
-                    return  # Exit the method, keeping the server running
-                time.sleep(1)
-                logging.debug(
-                    f"Waiting for server to start... (Elapsed: {time.time() - start_time:.2f}s)"
+            # Check if the process has terminated
+            if self.llamafile_process.poll() is not None:
+                stdout, stderr = self.llamafile_process.communicate()
+                logging.error(
+                    "Llamafile process terminated unexpectedly. "
+                    f"Exit code: {self.llamafile_process.returncode}"
+                )
+                logging.error(f"Stdout: {stdout}")
+                logging.error(f"Stderr: {stderr}")
+                raise RuntimeError(
+                    "Llamafile process terminated unexpectedly. "
+                    f"Exit code: {self.llamafile_process.returncode}"
                 )
 
-                # Check if the process has terminated
-                if self.llamafile_process.poll() is not None:
-                    stdout, stderr = self.llamafile_process.communicate()
-                    logging.error(
-                        f"Llamafile process terminated unexpectedly. Exit code: {self.llamafile_process.returncode}"
-                    )
-                    logging.error(f"Stdout: {stdout}")
-                    logging.error(f"Stderr: {stderr}")
-                    raise RuntimeError(
-                        f"Llamafile process terminated unexpectedly. Exit code: {self.llamafile_process.returncode}"
-                    )
-
-            # If we've reached here, the server didn't start in time
-            logging.error(f"Llamafile server failed to start within 60 seconds.")
-            self.llamafile_process.terminate()
-            raise RuntimeError("Llamafile server failed to start within 60 seconds.")
-
-        except Exception as e:
-            logging.exception(f"Error starting llamafile server: {str(e)}")
-            if self.llamafile_process:
-                logging.info("Terminating llamafile process due to startup error")
-                self.llamafile_process.terminate()
-            raise
+        # If we've reached here, the server didn't start in time
+        logging.error("Llamafile server failed to start within 60 seconds.")
+        self.llamafile_process.terminate()
+        raise RuntimeError("Llamafile server failed to start within 60 seconds.")
 
     def stop_llamafile_server(self):
+        """Stop the Llamafile server if it's running."""
         if self.llamafile_process:
             cleanup_llamafile(weakref.ref(self.llamafile_process))
             self.llamafile_process = None
 
     def cleanup(self):
+        """Clean up resources by stopping the Llamafile server."""
         self.stop_llamafile_server()
 
     def __del__(self):
+        """Destructor to ensure cleanup when the object is garbage collected."""
         try:
             self.cleanup()
         except (ProcessLookupError, OSError) as e:
@@ -403,21 +508,21 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def _get_generation_params(self):
         return {
-            "max_tokens": self.generation_params['max_new_tokens'],
-            "top_p": self.generation_params['top_p'],
-            "temperature": self.generation_params['temperature'],
+            "max_tokens": self.generation_params["max_new_tokens"],
+            "top_p": self.generation_params["top_p"],
+            "temperature": self.generation_params["temperature"],
             "stop": self.generation_params.get("stop", ["<|endoftext|>"]),
         }
 
     def _batch_generate(
-        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> List[str]:
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         self._ensure_server_running()
         return [self._generate(prompt) for prompt in prompts]
 
     async def _async_batch_generate(
-        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> List[str]:
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         self._ensure_server_running()
         max_concurrency = self.generation_params.get("max_concurrent_requests", 4)
         semaphore = asyncio.Semaphore(max_concurrency)
@@ -439,11 +544,13 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             self._server_running = True
 
     def __enter__(self):
+        """Context manager entry method."""
         self._context_depth += 1
         self._ensure_server_running()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit method."""
         self._context_depth -= 1
         if self._context_depth == 0:
             self.stop_llamafile_server()
@@ -451,6 +558,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     @classmethod
     def cleanup_all(cls):
+        """Class method to clean up all instances of Llamafile."""
         for instance_ref in list(cls._instances):
             instance = instance_ref()
             if instance is not None:
@@ -472,4 +580,6 @@ class LlamafileError(Exception):
 
 
 class DownloadError(Exception):
+    """Exception raised when there's an error downloading the Llamafile."""
+
     pass

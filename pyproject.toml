@@ -39,6 +39,7 @@ dev = [
     "isort",
     "pytest-cov",
     "codecov",
+    "mypy>=1.11.2",
 ]
 hf = [
     "transformers>=4.45.0",

@@ -1,9 +1,9 @@
 import logging
 import os
 import warnings
-from typing import Any, Dict, List
+from typing import Any
 
-from flow_judge.models.common import BaseFlowJudgeModel, ModelConfig, ModelType, GenerationParams
+from flow_judge.models.common import BaseFlowJudgeModel, GenerationParams, ModelConfig, ModelType
 
 try:
     import torch
@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class HfConfig(ModelConfig):
+    """Configuration class for Hugging Face models.
+
+    Extends the base ModelConfig with Hugging Face specific parameters.
+    """
+
     def __init__(
         self,
         model_id: str,
@@ -29,6 +34,15 @@ class HfConfig(ModelConfig):
         flash_attn: bool = True,
         **kwargs: Any,
     ):
+        """Initialize HfConfig with model details and Hugging Face specific parameters.
+
+        :param model_id: Identifier for the model.
+        :param generation_params: Parameters for text generation.
+        :param device_map: Device mapping strategy.
+        :param torch_dtype: PyTorch data type for the model.
+        :param flash_attn: Whether to use flash attention.
+        :param kwargs: Additional keyword arguments.
+        """
         super().__init__(model_id, ModelType.TRANSFORMERS, generation_params.model_dump(), **kwargs)
         self.device_map = device_map
         self.torch_dtype = torch_dtype
@@ -42,7 +56,7 @@ class Hf(BaseFlowJudgeModel):
     def __init__(
         self,
         model_id: str = None,
-        generation_params: Dict[str, Any] = None,
+        generation_params: dict[str, Any] = None,
         flash_attn: bool = True,
         **kwargs: Any,
     ):
@@ -63,7 +77,8 @@ class Hf(BaseFlowJudgeModel):
                 f"This library is designed for the '{default_model_id}' model. "
                 "Using other models may lead to unexpected behavior, and we do not handle "
                 "GitHub issues for unsupported models. Proceed with caution.",
-                UserWarning
+                UserWarning,
+                stacklevel=2,
             )
 
         model_id = model_id or default_model_id
@@ -80,7 +95,8 @@ class Hf(BaseFlowJudgeModel):
             os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
             logger.info(
-                "Downloading the model from Hugging Face Hub using hf-transfer for faster downloads..."
+                "Downloading the model from Hugging Face Hub using hf-transfer"
+                "for faster downloads...",
             )
             snapshot_download(repo_id=model_id)
 
@@ -106,9 +122,7 @@ class Hf(BaseFlowJudgeModel):
             self.config = config
 
             if self.device == "cpu":
-                logger.warning(
-                    "Running Hf on CPU may result in longer inference times."
-                )
+                logger.warning("Running Hf on CPU may result in longer inference times.")
 
             self.batch_size = 1  # Default to 1, will be updated in batch_generate
 
@@ -116,12 +130,19 @@ class Hf(BaseFlowJudgeModel):
             raise HfError(
                 status_code=2,
                 message=f"An error occurred while initializing the Hugging Face model: {str(e)}\n"
-                "Please make sure you have installed all required dependencies by adding 'hf' to your extras:\n"
-                "pip install flow-judge[hf]",
+                "Please make sure you have installed all required dependencies by adding 'hf' "
+                "to your extras:\npip install flow-judge[hf]",
             ) from e
 
-    def _determine_batch_size(self, prompts: List[str]) -> int:
-        """Determine an appropriate batch size based on available GPU memory and eval_inputs."""
+    def _determine_batch_size(self, prompts: list[str]) -> int:
+        """Determine an appropriate batch size based on available GPU memory and eval_inputs.
+
+        This method attempts to find the largest batch size that can be processed without
+        running out of GPU memory.
+
+        :param prompts: List of input prompts to be processed.
+        :return: The determined optimal batch size.
+        """
         if self.device == "cpu":
             return 1  # Default to 1 for CPU
 
@@ -169,10 +190,11 @@ class Hf(BaseFlowJudgeModel):
                 else:
                     raise
 
-    def _prepare_generation_kwargs(self, **kwargs: Any) -> Dict[str, Any]:
-        """
-        Prepare generation kwargs by combining generation params,
-        passed kwargs, and relevant config kwargs.
+    def _prepare_generation_kwargs(self, **kwargs: Any) -> dict[str, Any]:
+        """Combines generation params, passed kwargs, and relevant config kwargs.
+
+        :param kwargs: Additional keyword arguments for generation.
+        :return: A dictionary of prepared generation kwargs.
         """
         generation_kwargs = {**self.generation_params, **kwargs}
         for key, value in self.config.kwargs.items():
@@ -195,8 +217,8 @@ class Hf(BaseFlowJudgeModel):
         return generated_text.strip()
 
     def _batch_generate(
-        self, prompts: List[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> List[str]:
+        self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
+    ) -> list[str]:
         """Generate responses for multiple prompts using batching."""
         all_results = []
 

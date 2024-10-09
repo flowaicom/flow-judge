@@ -29,21 +29,25 @@ __all__ = [
 # Conditional imports for optional dependencies
 try:
     from flow_judge.models.huggingface import Hf
+
     __all__.append("Hf")
 except ImportError:
     Hf = None
 
 try:
     from flow_judge.models.vllm import Vllm
+
     __all__.append("Vllm")
 except ImportError:
     Vllm = None
 
 try:
     from flow_judge.models.llamafile import Llamafile
+
     __all__.append("Llamafile")
 except ImportError:
     Llamafile = None
+
 
 def get_available_models():
     """Return a list of available model classes based on installed extras."""
@@ -55,6 +59,7 @@ def get_available_models():
     if Llamafile is not None:
         models.append(Llamafile)
     return models
+
 
 __all__.append("get_available_models")
 

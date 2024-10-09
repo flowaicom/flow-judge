@@ -21,13 +21,18 @@ env:
 
 jobs:
   check:
-    name: Check workflow
+    name: Check workflow (and have one non-dependent job)
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Check Python version
-        run: python --version
+      - name: Check for necessary files
+        run: |
+          if [ ! -f "pyproject.toml" ]; then
+            echo "pyproject.toml is missing"
+            exit 1
+          fi
+          echo "Build file is present"
 
   build:
     name: Build distribution 📦

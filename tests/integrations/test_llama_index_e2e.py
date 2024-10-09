@@ -1,4 +1,5 @@
 import logging
+import os
 import statistics
 import tempfile
 from collections import Counter
@@ -224,6 +225,7 @@ async def test_correctness_evaluation(
         AssertionError: If the evaluation score is outside the expected range or feedback
             is missing.
     """
+    os.environ["HF_HOME"] = str(test_cache_dir)
     model = Vllm(
         exec_async=True,
         gpu_memory_utilization=0.5,
@@ -291,6 +293,7 @@ async def test_batch_evaluation(correctness_metric, query, reference, test_cache
     Raises:
         AssertionError: If the evaluation results do not meet expected criteria.
     """
+    os.environ["HF_HOME"] = str(test_cache_dir)
     model = Vllm(
         exec_async=True,
         gpu_memory_utilization=0.5,

@@ -44,6 +44,10 @@ dev = [
     "types-tqdm",
     "memray>=1.14.0",
     "pytest-memray>=1.7.0",
+    "pytest-asyncio>=0.24.0",
+]
+integrations-test = [
+    "llama-index"
 ]
 hf = [
     "transformers>=4.45.0",
@@ -104,6 +108,9 @@ disallow_incomplete_defs = false
 universal = true
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 markers = [
-    "memray: marks tests to be run with memray profiling"
+    "asyncio: mark test as an asyncio coroutine",
+    "memray: marks tests to be run with memray profiling",
+    "e2e: marks end-to-end tests",
 ]

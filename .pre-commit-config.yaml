@@ -20,14 +20,14 @@ repos:
     rev: 23.9.1
     hooks:
       - id: black
-        args: [--config, pyproject.toml]
+        args: [--check, --config, pyproject.toml]
         language_version: python3.11
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.12.0
     hooks:
       - id: isort
-        args: [--settings-path, pyproject.toml]
+        args: [--check-only, --settings-path, pyproject.toml]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.10.1

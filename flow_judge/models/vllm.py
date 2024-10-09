@@ -199,11 +199,9 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             os.environ["HF_HOME"] = download_dir
             if exec_async:
                 engine_args["disable_log_requests"] = kwargs.get("disable_log_requests", False)
-                self.engine = AsyncLLMEngine.from_engine_args(
-                    AsyncEngineArgs(**engine_args, download_dir=download_dir)
-                )
+                self.engine = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(**engine_args))
             else:
-                self.model = LLM(**engine_args, download_dir=download_dir)
+                self.model = LLM(**engine_args)
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         except Exception as e:

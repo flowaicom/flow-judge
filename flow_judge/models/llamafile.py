@@ -17,7 +17,7 @@ from tqdm import tqdm
 from flow_judge.models.common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
-    LlamafileGenerationParams,
+    GenerationParams,
     ModelConfig,
     ModelType,
 )
@@ -45,7 +45,7 @@ class LlamafileConfig(ModelConfig):
 
     def __init__(
         self,
-        generation_params: LlamafileGenerationParams,
+        generation_params: GenerationParams,
         model_filename: str = "flow-judge.llamafile",
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
         port: int = 8085,
@@ -192,7 +192,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 stacklevel=2,
             )
 
-        generation_params = LlamafileGenerationParams(**(generation_params or {}))
+        generation_params = GenerationParams(**(generation_params or {}))
 
         if port is None:
             port = self._get_next_port()

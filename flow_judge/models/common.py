@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class BaseFlowJudgeModel(ABC):
@@ -66,29 +66,6 @@ class GenerationParams(BaseModel):
     top_p: float = 0.95
     max_new_tokens: int = 1000
     do_sample: bool = True
-
-
-class LlamafileGenerationParams(GenerationParams):
-    """Configuration parameters specific to Llamafile text generation."""
-
-    context_size: int = Field(default=8192, description="Context size for the model")
-    gpu_layers: int = Field(default=34, description="Number of GPU layers to use")
-    thread_count: int = Field(default=None, description="Number of threads to use")
-    batch_size: int = Field(default=32, description="Batch size for generation")
-    max_concurrent_requests: int = Field(
-        default=1, description="Maximum number of concurrent requests"
-    )
-
-    def __init__(self, **data):
-        """Initialize LlamafileGenerationParams with given data.
-
-        :param data: Keyword arguments to initialize the parameters.
-        """
-        super().__init__(**data)
-        if self.thread_count is None:
-            import os
-
-            self.thread_count = os.cpu_count() or 1
 
 
 class VllmGenerationParams(GenerationParams):

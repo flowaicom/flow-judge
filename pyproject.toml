@@ -66,6 +66,7 @@ version_scheme = "python-simplified-semver"
 
 [tool.ruff]
 line-length = 100
+include = ["flow_judge/**/*.py", "tests/**/*.py", "setup.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C", "D"]
@@ -79,11 +80,13 @@ convention = "google"
 
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ['py311']
+include = '(flow_judge/.*\.py$|tests/.*\.py$|setup\.py)'
 
 [tool.isort]
 profile = "black"
 line_length = 100
+src_paths = ["flow_judge", "tests"]
 
 [tool.mypy]
 warn_unused_configs = true

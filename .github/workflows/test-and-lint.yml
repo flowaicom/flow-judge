@@ -22,13 +22,13 @@ jobs:
         pip install ruff==0.1.3 black==23.9.1 isort==5.12.0 pyupgrade==3.10.1
     - name: Lint with ruff
       run: |
-        ruff check .
+        ruff check . --config pyproject.toml
     - name: Format with black
       run: |
-        black --check --diff .
+        black --check . --config pyproject.toml
     - name: Sort imports with isort
       run: |
-        isort --check-only --diff .
+        isort --check-only . --settings-path pyproject.toml
     - name: Check for Python upgrades
       run: |
         files=$(git ls-files '*.py')

@@ -293,13 +293,16 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 total_size = int(response.headers.get("content-length", 0))
                 block_size = 8192
 
-                with open(llamafile_path, "wb") as file, tqdm(
-                    desc="Downloading",
-                    total=total_size,
-                    unit="iB",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                ) as progress_bar:
+                with (
+                    open(llamafile_path, "wb") as file,
+                    tqdm(
+                        desc="Downloading",
+                        total=total_size,
+                        unit="iB",
+                        unit_scale=True,
+                        unit_divisor=1024,
+                    ) as progress_bar,
+                ):
                     for data in response.iter_content(block_size):
                         size = file.write(data)
                         progress_bar.update(size)

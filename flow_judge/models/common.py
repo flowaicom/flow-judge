@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BaseFlowJudgeModel(ABC):
@@ -10,9 +10,9 @@ class BaseFlowJudgeModel(ABC):
 
     def __init__(
         self, model_id: str, model_type: str, generation_params: dict[str, Any], **kwargs: Any
-    ):
+    ) -> None:
         """Initialize the base FlowJudge model."""
-        self.metadata = {
+        self.metadata: dict[str, Any] = {
             "model_id": model_id,
             "model_type": model_type,
             "generation_params": generation_params,
@@ -37,9 +37,9 @@ class AsyncBaseFlowJudgeModel(ABC):
 
     def __init__(
         self, model_id: str, model_type: str, generation_params: dict[str, Any], **kwargs: Any
-    ):
+    ) -> None:
         """Initialize the base asynchronous FlowJudge model."""
-        self.metadata = {
+        self.metadata: dict[str, Any] = {
             "model_id": model_id,
             "model_type": model_type,
             "generation_params": generation_params,
@@ -62,10 +62,12 @@ class AsyncBaseFlowJudgeModel(ABC):
 class GenerationParams(BaseModel):
     """Configuration parameters for text generation."""
 
-    temperature: float = 0.1
-    top_p: float = 0.95
-    max_new_tokens: int = 1000
-    do_sample: bool = True
+    temperature: float = Field(default=0.1, description="Sampling temperature")
+    top_p: float = Field(default=0.95, description="Top-p sampling parameter")
+    max_new_tokens: int = Field(
+        default=1000, description="Maximum number of new tokens to generate"
+    )
+    do_sample: bool = Field(default=True, description="Whether to use sampling for generation")
 
 
 class VllmGenerationParams(GenerationParams):
@@ -88,19 +90,19 @@ class VllmGenerationParams(GenerationParams):
 class ModelType(Enum):
     """Enum for the type of model."""
 
-    TRANSFORMERS = "transformers"
-    VLLM = "vllm"
-    VLLM_ASYNC = "vllm_async"
-    LLAMAFILE = "llamafile"
+    TRANSFORMERS: str = "transformers"
+    VLLM: str = "vllm"
+    VLLM_ASYNC: str = "vllm_async"
+    LLAMAFILE: str = "llamafile"
 
 
 class Engine(Enum):
     """Enum for the type of engine used for text generation."""
 
-    VLLM = "vllm"
-    VLLM_ASYNC = "vllm_async"
-    HF = "hf"  # HF stands for Hugging Face (Transformers)
-    LLAMAFILE = "llamafile"
+    VLLM: str = "vllm"
+    VLLM_ASYNC: str = "vllm_async"
+    HF: str = "hf"  # HF stands for Hugging Face (Transformers)
+    LLAMAFILE: str = "llamafile"
 
 
 class ModelConfig:
@@ -112,7 +114,7 @@ class ModelConfig:
         model_type: ModelType,
         generation_params: dict[str, Any],
         **kwargs: Any,
-    ):
+    ) -> None:
         """Initialize ModelConfig with model details and generation parameters.
 
         :param model_id: Identifier for the model.
@@ -120,7 +122,7 @@ class ModelConfig:
         :param generation_params: Parameters for text generation.
         :param kwargs: Additional keyword arguments.
         """
-        self.model_id = model_id
-        self.model_type = model_type
-        self.generation_params = generation_params
-        self.kwargs = kwargs
+        self.model_id: str = model_id
+        self.model_type: ModelType = model_type
+        self.generation_params: dict[str, Any] = generation_params
+        self.kwargs: dict[str, Any] = kwargs

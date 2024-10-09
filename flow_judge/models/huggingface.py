@@ -55,8 +55,8 @@ class Hf(BaseFlowJudgeModel):
 
     def __init__(
         self,
-        model_id: str = None,
-        generation_params: dict[str, Any] = None,
+        model_id: str | None = None,
+        generation_params: dict[str, Any] | None = None,
         flash_attn: bool = True,
         **kwargs: Any,
     ):

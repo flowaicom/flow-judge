@@ -72,8 +72,8 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(
         self,
-        model_id: str = None,
-        generation_params: dict[str, Any] = None,
+        model_id: str | None = None,
+        generation_params: dict[str, Any] | None = None,
         quantized: bool = True,
         exec_async: bool = False,
         **kwargs: Any,

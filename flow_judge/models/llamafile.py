@@ -54,10 +54,10 @@ class LlamafileConfig(ModelConfig):
         flash_attn: bool = True,
         context_size: int = 8192,
         gpu_layers: int = 34,
-        thread_count: int = None,
+        thread_count: int | None = None,
         batch_size: int = 32,
         max_concurrent_requests: int = 1,
-        llamafile_server_kwargs: dict[str, Any] = None,
+        llamafile_server_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         """Initialize LlamafileConfig with model details and Llamafile specific parameters.
@@ -126,18 +126,18 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def __init__(
         self,
-        generation_params: dict[str, Any] = None,
+        generation_params: dict[str, Any] | None = None,
         cache_dir: str = os.path.expanduser("~/.cache/flow-judge"),
-        port: int = None,
+        port: int | None = None,
         disable_kv_offload: bool = False,
         quantized_kv: bool = True,
         flash_attn: bool = True,
         context_size: int = 8192,
         gpu_layers: int = 34,
-        thread_count: int = None,
+        thread_count: int | None = None,
         batch_size: int = 32,
         max_concurrent_requests: int = 1,
-        llamafile_server_kwargs: dict[str, Any] = None,
+        llamafile_server_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         """Initialize the FlowJudge Llamafile model.

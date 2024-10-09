@@ -60,6 +60,8 @@ jobs:
         python -c "import torch; print(torch.cuda.is_available())"
     - name: Test with pytest and generate coverage
       run: |
+        export HF_HOME=/tmp/hf_home
+        export TRANSFORMERS_CACHE=/tmp/hf_home
         pytest --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

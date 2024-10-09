@@ -152,6 +152,8 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         generation_params = VllmGenerationParams(**(generation_params or {}))
 
+        download_dir = kwargs.get("download_dir", None)
+
         # Translate max_new_tokens to max_tokens for vLLM
         if "max_new_tokens" in generation_params.model_dump():
             generation_params.max_tokens = generation_params.max_new_tokens
@@ -189,6 +191,7 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "gpu_memory_utilization": config.gpu_memory_utilization,
                 "max_num_seqs": config.max_num_seqs,
                 "quantization": "awq_marlin" if config.quantization else None,
+                "download_dir": download_dir,  # FIXME: fix arg passing
                 **kwargs,
             }
 

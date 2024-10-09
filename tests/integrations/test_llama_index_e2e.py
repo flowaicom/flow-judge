@@ -1,6 +1,8 @@
 import logging
 import statistics
+import tempfile
 from collections import Counter
+from pathlib import Path
 
 import pytest
 from llama_index.core import VectorStoreIndex
@@ -12,6 +14,23 @@ from flow_judge.metrics import CustomMetric, RubricItem
 from flow_judge.models import Vllm
 
 pytest_plugins = ("pytest_asyncio",)
+
+
+@pytest.fixture(scope="module")
+def test_cache_dir():
+    """Create a temporary directory for test cache.
+
+    This fixture creates a temporary directory that is guaranteed to be
+    writable and cleaned up after the tests.
+
+    :yield: Path object pointing to the temporary directory
+    :rtype: pathlib.Path
+    """
+    with tempfile.TemporaryDirectory(prefix="flow-judge-test-") as tmpdir:
+        temp_path = Path(tmpdir)
+        logging.info(f"Created temporary test cache directory: {temp_path}")
+        yield temp_path
+    logging.info(f"Cleaned up temporary test cache directory: {temp_path}")
 
 
 @pytest.fixture
@@ -206,8 +225,11 @@ async def test_correctness_evaluation(correctness_metric, query, reference, resp
     result = await flow_judge_evaluator.aevaluate(
         query=query, reference=reference, response=response
     )
-    assert 2 <= result.score <= 4
-    assert result.feedback is not None
+    if result:
+        assert 2 <= int(result.score) <= 4
+        assert result.feedback is not None
+    else:
+        raise AssertionError("Couldn't process 'result'")
     del model
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import warnings
 from typing import Any
 
@@ -195,11 +196,14 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 **kwargs,
             }
 
+            os.environ["HF_HOME"] = download_dir
             if exec_async:
                 engine_args["disable_log_requests"] = kwargs.get("disable_log_requests", False)
-                self.engine = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(**engine_args))
+                self.engine = AsyncLLMEngine.from_engine_args(
+                    AsyncEngineArgs(**engine_args, download_dir=download_dir)
+                )
             else:
-                self.model = LLM(**engine_args)
+                self.model = LLM(**engine_args, download_dir=download_dir)
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         except Exception as e:

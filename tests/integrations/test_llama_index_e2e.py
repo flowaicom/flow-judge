@@ -279,18 +279,24 @@ def compare_distributions(
 
 
 @pytest.mark.asyncio
-async def test_batch_evaluation(correctness_metric, query, reference):
+async def test_batch_evaluation(correctness_metric, query, reference, test_cache_dir):
     """Performs a batch evaluation of queries using LlamaIndexFlowJudge and analyzes results.
 
     Args:
         correctness_metric (CustomMetric): The metric used for evaluation.
         query (str): A sample query (not used directly in this function).
         reference (str): A sample reference answer (not used directly in this function).
+        test_cache_dir (Path): Temp dir that is sure to be okay during testing
 
     Raises:
         AssertionError: If the evaluation results do not meet expected criteria.
     """
-    model = Vllm(exec_async=True, gpu_memory_utilization=0.5, quantized=True)
+    model = Vllm(
+        exec_async=True,
+        gpu_memory_utilization=0.5,
+        quantized=True,
+        download_dir=str(test_cache_dir),
+    )
     logging.info("Starting test_batch_evaluation")
 
     flow_judge_correctness = LlamaIndexFlowJudge(model=model, metric=correctness_metric)

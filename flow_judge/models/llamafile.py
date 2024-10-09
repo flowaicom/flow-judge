@@ -43,6 +43,8 @@ class LlamafileConfig(ModelConfig):
     Extends the base ModelConfig with Llamafile specific parameters.
     """
 
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1-Llamafile"
+
     def __init__(
         self,
         generation_params: GenerationParams,
@@ -60,24 +62,14 @@ class LlamafileConfig(ModelConfig):
         llamafile_server_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
-        """Initialize LlamafileConfig with model details and Llamafile specific parameters.
-
-        :param generation_params: Parameters for text generation.
-        :param model_filename: Name of the Llamafile model file.
-        :param cache_dir: Directory to cache the model.
-        :param port: Port to run the Llamafile server on.
-        :param disable_kv_offload: Whether to disable KV offloading.
-        :param quantized_kv: Whether to enable Quantized KV.
-        :param flash_attn: Whether to enable Flash Attention.
-        :param context_size: Size of the context window.
-        :param gpu_layers: Number of GPU layers to use.
-        :param thread_count: Number of threads to use. If None, uses the number of CPU cores.
-        :param batch_size: Batch size for processing.
-        :param max_concurrent_requests: Maximum number of concurrent requests.
-        :param llamafile_server_kwargs: Additional keyword arguments for the Llamafile server.
-        :param kwargs: Additional keyword arguments.
-        """
-        super().__init__(ModelType.LLAMAFILE, generation_params.model_dump(), **kwargs)
+        """Initialize LlamafileConfig with model details and Llamafile specific parameters."""
+        model_id = kwargs.pop("_model_id", None) or self._DEFAULT_MODEL_ID
+        super().__init__(
+            model_id=model_id,
+            model_type=ModelType.LLAMAFILE,
+            generation_params=generation_params,
+            **kwargs,
+        )
         self.model_filename = model_filename
         self.cache_dir = cache_dir
         self.port = port
@@ -216,6 +208,7 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             llamafile_server_kwargs=llamafile_server_kwargs,
             **kwargs,
         )
+        self.config = config
 
         # Call both parent class initializers
         BaseFlowJudgeModel.__init__(
@@ -373,7 +366,6 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             f"-c {self.config.context_size} "
             f"-ngl {self.config.gpu_layers} "
             f"--temp {self.generation_params.temperature} "
-            f"--top-p {self.generation_params.top_p} "
             f"-n {self.generation_params.max_new_tokens} "
             f"--threads {self.config.thread_count} "
             f"--nobrowser -b {self.config.batch_size} "
@@ -381,19 +373,19 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             f"--cont-batching"
         )
 
-        if self.disable_kv_offload:
+        if self.config.disable_kv_offload:
             command += " -nkvo"
             logging.info("KV offloading disabled")
 
-        if self.quantized_kv:
+        if self.config.quantized_kv:
             command += " -ctk q4_0 -ctv q4_0"
             logging.info("Quantized KV enabled")
 
-        if self.flash_attn:
+        if self.config.flash_attn:
             command += " -fa"
             logging.info("Flash Attention enabled")
 
-        if self.quantized_kv and not self.flash_attn:
+        if self.config.quantized_kv and not self.config.flash_attn:
             raise LlamafileError(
                 "Quantized KV is enabled but Flash Attention is disabled."
                 " This configuration won't function."
@@ -508,10 +500,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     def _get_generation_params(self):
         return {
-            "max_tokens": self.generation_params["max_new_tokens"],
-            "top_p": self.generation_params["top_p"],
-            "temperature": self.generation_params["temperature"],
-            "stop": self.generation_params.get("stop", ["<|endoftext|>"]),
+            "max_tokens": self.generation_params.max_new_tokens,
+            "top_p": self.generation_params.top_p,
+            "temperature": self.generation_params.temperature,
+            "stop": getattr(self.generation_params, "stop", ["<|endoftext|>"]),
         }
 
     def _batch_generate(

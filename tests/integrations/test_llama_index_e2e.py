@@ -8,6 +8,7 @@ import pytest
 from llama_index.core import VectorStoreIndex
 from llama_index.core.evaluation import BatchEvalRunner
 from llama_index.core.llama_dataset import download_llama_dataset
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 from flow_judge.integrations.llama_index import LlamaIndexFlowJudge
 from flow_judge.metrics import CustomMetric, RubricItem
@@ -207,7 +208,9 @@ def correctness_metric():
 
 
 @pytest.mark.asyncio
-async def test_correctness_evaluation(correctness_metric, query, reference, response):
+async def test_correctness_evaluation(
+    correctness_metric, query, reference, response, test_cache_dir
+):
     """Tests the correctness evaluation of a generated response using LlamaIndexFlowJudge.
 
     Args:
@@ -215,12 +218,18 @@ async def test_correctness_evaluation(correctness_metric, query, reference, resp
         query (str): The input query.
         reference (str): The reference answer.
         response (str): The generated response to evaluate.
+        test_cache_dir (Path): Temp dir that is sure to be okay during testing
 
     Raises:
         AssertionError: If the evaluation score is outside the expected range or feedback
             is missing.
     """
-    model = Vllm(exec_async=True, gpu_memory_utilization=0.5, quantized=True)
+    model = Vllm(
+        exec_async=True,
+        gpu_memory_utilization=0.5,
+        quantized=True,
+        download_dir=str(test_cache_dir),
+    )
     flow_judge_evaluator = LlamaIndexFlowJudge(model=model, metric=correctness_metric)
     result = await flow_judge_evaluator.aevaluate(
         query=query, reference=reference, response=response
@@ -292,7 +301,8 @@ async def test_batch_evaluation(correctness_metric, query, reference):
     )
 
     # Create the index and query engine
-    index = VectorStoreIndex.from_documents(documents=documents)
+    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    index = VectorStoreIndex.from_documents(documents=documents, embed_model=embed_model)
     query_engine = index.as_query_engine()
 
     # Prepare queries and references

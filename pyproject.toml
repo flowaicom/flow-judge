@@ -47,7 +47,8 @@ dev = [
     "pytest-asyncio>=0.24.0",
 ]
 integrations-test = [
-    "llama-index"
+    "llama-index",
+    "llama-index-embeddings-huggingface"
 ]
 hf = [
     "transformers>=4.45.0",

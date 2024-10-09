@@ -91,15 +91,27 @@ def cleanup_llamafile(process_ref):
     """
     process = process_ref()
     if process:
+        pgid = None
         try:
             pgid = os.getpgid(process.pid)
             os.killpg(pgid, signal.SIGTERM)
             process.wait(timeout=5)
         except (subprocess.TimeoutExpired, ProcessLookupError):
+            if pgid is not None:
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        except OSError:
+            # Handle the case where we can't get the process group ID
             try:
-                os.killpg(pgid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+                process.terminate()
+                process.wait(timeout=5)
+            except (subprocess.TimeoutExpired, ProcessLookupError):
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
 
 
 class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):

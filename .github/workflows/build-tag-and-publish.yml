@@ -23,6 +23,7 @@ jobs:
   build:
     name: Build distribution 📦
     runs-on: self-hosted
+    needs: [lint, test]
 
     steps:
     - uses: actions/checkout@v4
@@ -67,7 +68,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python 🐍 distribution 📦 to PyPI
-    needs: [build]
+    needs: [build, publish-to-testpypi]
     runs-on: self-hosted
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment:

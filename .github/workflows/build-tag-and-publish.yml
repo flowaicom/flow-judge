@@ -20,9 +20,25 @@ env:
   PYTHON_VERSION: '3.11'
 
 jobs:
+  check:
+    name: Check workflow (and have one non-dependent job)
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check for necessary files
+        run: |
+          if [ ! -f "pyproject.toml" ]; then
+            echo "pyproject.toml is missing"
+            exit 1
+          fi
+          echo "Build file is present"
+
   build:
     name: Build distribution 📦
     runs-on: self-hosted
+    needs: [check]
+    if: ${{ always() && needs.check.result == 'success' }}
 
     steps:
     - uses: actions/checkout@v4
@@ -67,7 +83,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python 🐍 distribution 📦 to PyPI
-    needs: [build]
+    needs: [build, publish-to-testpypi]
     runs-on: self-hosted
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment:

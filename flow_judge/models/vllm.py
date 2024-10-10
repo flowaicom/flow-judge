@@ -28,9 +28,10 @@ class VllmConfig(ModelConfig):
     including both synchronous and asynchronous execution modes.
     """
 
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1"
+
     def __init__(
         self,
-        model_id: str,
         generation_params: VllmGenerationParams,
         max_model_len: int = 8192,
         trust_remote_code: bool = True,
@@ -47,6 +48,7 @@ class VllmConfig(ModelConfig):
 
         For a full list of parameters and their descriptions, see the Vllm class docstring.
         """
+        model_id = kwargs.pop("_model_id", self._DEFAULT_MODEL_ID)
         model_type = ModelType.VLLM_ASYNC if exec_async else ModelType.VLLM
         super().__init__(model_id, model_type, generation_params.model_dump(), **kwargs)
         self.max_model_len = max_model_len
@@ -71,9 +73,10 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     @https://docs.vllm.ai/en/stable/models/engine_args.html
     """
 
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1"
+
     def __init__(
         self,
-        model_id: str | None = None,
         generation_params: dict[str, Any] | None = None,
         quantized: bool = True,
         exec_async: bool = False,
@@ -81,7 +84,6 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     ):
         """Initialize the FlowJudge vLLM model.
 
-        :param model_id: Identifier for the model. If None, uses the default model.
         :param generation_params: Dictionary of parameters for text generation. Can include:
             - temperature: float (default: 0.1)
             - top_p: float (default: 0.95)
@@ -134,13 +136,13 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 ),
             )
 
-        default_model_id = "flowaicom/Flow-Judge-v0.1"
+        model_id = kwargs.pop("_model_id", self._DEFAULT_MODEL_ID)
 
-        if model_id is not None and model_id != default_model_id:
+        if model_id != self._DEFAULT_MODEL_ID:
             warnings.warn(
                 (
                     f"The model '{model_id}' is not officially supported. "
-                    f"This library is designed for the '{default_model_id}' model. "
+                    f"This library is designed for the '{self._DEFAULT_MODEL_ID}' model. "
                     "Using other models may lead to unexpected behavior, and we do "
                     "not handle GitHub issues for unsupported models. Proceed with caution."
                 ),
@@ -148,8 +150,9 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 stacklevel=2,
             )
 
-        model_id = model_id or default_model_id
-        model_id = f"{model_id}-AWQ" if quantized and model_id == default_model_id else model_id
+        model_id = (
+            f"{model_id}-AWQ" if quantized and model_id == self._DEFAULT_MODEL_ID else model_id
+        )
 
         generation_params = VllmGenerationParams(**(generation_params or {}))
 
@@ -161,10 +164,10 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             del generation_params.max_new_tokens
 
         config = VllmConfig(
-            model_id=model_id,
             generation_params=generation_params,
             quantization=quantized,
             exec_async=exec_async,
+            _model_id=model_id,
             **kwargs,
         )
 

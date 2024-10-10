@@ -20,14 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 class HfConfig(ModelConfig):
-    """Configuration class for Hugging Face models.
+    """Configuration class for Hugging Face models."""
 
-    Extends the base ModelConfig with Hugging Face specific parameters.
-    """
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1"
 
     def __init__(
         self,
-        model_id: str,
         generation_params: GenerationParams,
         device_map: str = "auto",
         torch_dtype: str = "bfloat16",
@@ -36,13 +34,13 @@ class HfConfig(ModelConfig):
     ):
         """Initialize HfConfig with model details and Hugging Face specific parameters.
 
-        :param model_id: Identifier for the model.
         :param generation_params: Parameters for text generation.
         :param device_map: Device mapping strategy.
         :param torch_dtype: PyTorch data type for the model.
         :param flash_attn: Whether to use flash attention.
         :param kwargs: Additional keyword arguments.
         """
+        model_id = kwargs.pop("_model_id", self._DEFAULT_MODEL_ID)
         super().__init__(model_id, ModelType.TRANSFORMERS, generation_params.model_dump(), **kwargs)
         self.device_map = device_map
         self.torch_dtype = torch_dtype
@@ -53,14 +51,22 @@ class HfConfig(ModelConfig):
 class Hf(BaseFlowJudgeModel):
     """FlowJudge model class for Hugging Face Transformers."""
 
+    _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1"
+
     def __init__(
         self,
-        model_id: str | None = None,
         generation_params: dict[str, Any] | None = None,
         flash_attn: bool = True,
         **kwargs: Any,
     ):
-        """Initialize the FlowJudge Hugging Face Transformers model."""
+        """Initialize the FlowJudge Hugging Face Transformers model.
+
+        :param generation_params: Dictionary of parameters for text generation.
+        :param flash_attn: Whether to use flash attention.
+        :param kwargs: Additional keyword arguments, including:
+            - _model_id: Identifier for the model. If None, uses the default model.
+            // ... other kwargs ...
+        """
         if not HF_AVAILABLE:
             raise HfError(
                 status_code=1,
@@ -69,24 +75,22 @@ class Hf(BaseFlowJudgeModel):
                 "pip install flow-judge[hf]",
             )
 
-        default_model_id = "flowaicom/Flow-Judge-v0.1"
+        model_id = kwargs.pop("_model_id", self._DEFAULT_MODEL_ID)
 
-        if model_id is not None and model_id != default_model_id:
+        if model_id != self._DEFAULT_MODEL_ID:
             warnings.warn(
                 f"The model '{model_id}' is not officially supported. "
-                f"This library is designed for the '{default_model_id}' model. "
+                f"This library is designed for the '{self._DEFAULT_MODEL_ID}' model. "
                 "Using other models may lead to unexpected behavior, and we do not handle "
                 "GitHub issues for unsupported models. Proceed with caution.",
                 UserWarning,
                 stacklevel=2,
             )
 
-        model_id = model_id or default_model_id
-
         generation_params = GenerationParams(**(generation_params or {}))
 
         config = HfConfig(
-            model_id=model_id, generation_params=generation_params, flash_attn=flash_attn, **kwargs
+            generation_params=generation_params, flash_attn=flash_attn, _model_id=model_id, **kwargs
         )
 
         super().__init__(model_id, "transformers", config.generation_params, **kwargs)

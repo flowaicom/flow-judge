@@ -1,169 +1,116 @@
 import os
 import json
-import time
+import openai
 import requests
+import asyncio
+import aiohttp
+import logging
 
-from typing import Any, Dict
+from typing import Any, Dict, List
+from openai import OpenAIError
 
 from ..base import BaseAPIAdapter
+
+logger = logging.getLogger(__name__)
 
 class BasetenAPIAdapter(BaseAPIAdapter):
     """API utility class to execute sync requests from Baseten remote model hosting."""
     def __init__(self, baseten_model_id: str):
-        super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
-        self.baseten_model_id = baseten_model_id
+        base_url = f"https://model-{baseten_model_id}.api.baseten.co/production"
+        super().__init__(base_url)
+        openai.base_url = base_url
 
+        self.baseten_model_id = baseten_model_id
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
+            openai.api_key = self.baseten_api_key
         except KeyError:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.")
 
     def _make_request(self, request_messages: Dict[str, Any]) -> Dict:
-        resp = requests.post(
-            url=self.base_url + "/predict",
-            headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
-            json=request_messages
-        )
+        try:
+            completion = openai.chat.completions.create(
+                messages=request_messages
+            )
+            return completion
+        
+        except OpenAIError as e:
+            logger.warning(f"Model request failed: {e}")
+        except Exception as e:
+            logger.warning(f"An unexpected error occurred: {e}")
 
-        return resp.json()
-
-    def fetch_response(self, request_messages: Dict[str, Any]) -> str:
+    def _fetch_response(self, request_messages: Dict[str, Any]) -> str:
         request_body = {"messages": request_messages}
-        parsed_resp = self._make_request(request_body)
+        completion = self._make_request(request_body)
 
         try:
-            message = parsed_resp["choices"][0]["message"]["content"].strip()
+            message = completion.choices[0].message.content.strip()
             return message
         except Exception as e:
-            # TODO: Log warning here (?)
+            logger.warning(f"Failed to parse model response: {e}")
+            logger.warning("Returning default value")
             return ""
         
-    def fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
+    def _fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
         outputs = []
         for message in request_messages:
             request_body = {"messages": message}
-            parsed_resp = self._make_request(request_body)
-            outputs.append(parsed_resp["choices"][0]["message"]["content"].strip())
+            completion = self._make_request(request_body)
+            outputs.append(completion.choices[0].message.content.strip())
         return outputs
 
 class AsyncBasetenAPIAdapter(BaseAPIAdapter):
     """Async webhook requests for the Baseten remote model"""
     def __init__(self, baseten_model_id: str, webhook_proxy_url: str):
         super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
-
         self.baseten_model_id = baseten_model_id
         self.webhook_proxy_url = webhook_proxy_url
-
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError:
-            raise ValueError("BASETEN_API_KEY is not provided in the environment.")        
+            raise ValueError("BASETEN_API_KEY is not provided in the environment.")
 
-    def _make_request(self, request_messages: Dict[str, Any]) -> str:
+    async def _make_request(self, request_messages: Dict[str, Any]) -> str:
         model_input = {"messages": request_messages}
-        resp = requests.post(
-            url=self.base_url + "/async_predict",
-            headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
-            json={
-                "webhook_endpoint": self.webhook_proxy_url + "/webhook",
-                "model_input": model_input
-            }
-        )
-        return resp.json()["request_id"]
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url=self.base_url + "/async_predict",
+                headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
+                json={
+                    "webhook_endpoint": self.webhook_proxy_url + "/webhook",
+                    "model_input": model_input
+                }
+            ) as response:
+                resp_json = await response.json()
+                return resp_json["request_id"]
 
-    def fetch_response(self, request_messages: Dict[str, Any]) -> str:
-        request_id = self._make_request(request_messages)
-        stream = requests.get(f"{self.webhook_proxy_url}/listen/{request_id}", stream=True)
-        message = ""
-        for chunk in stream.iter_content(chunk_size=None):
-            if not chunk:
-                break
-            elif chunk.decode() == "data: keep-alive\n\n":
-                continue
-            else:
-                decoded_chunk = chunk.decode()
-                data_and_eot = decoded_chunk.split("\n\n")
-                data_chunk = data_and_eot[0]
-                resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
-
-                try:
-                    resp = json.loads(resp_str)
-                    message = resp["data"]["choices"][0]["message"]["content"].strip()
-                except Exception as e:
-                    # raise? warn?
-                    continue
-
-                if len(data_and_eot) > 1 and "\n\ndata: eot" in data_and_eot[1]:
-                    stream.close()
-
-        return message
-
-    def fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
-        request_ids = [self._make_request([message]) for message in request_messages]
-        all_messages = []
-        # Define retry parameters
-        max_retries = 3
-        retry_delay = 2  # seconds
-
-        # Process the streams in batches of 4
-        batch_size = 4
-        for i in range(0, len(request_ids), batch_size):
-            batch_ids = request_ids[i:i + batch_size]
-
-            # Open a stream for each request ID in the current batch
-            open_streams = []
-            for request_id in batch_ids:
-                for attempt in range(max_retries):
+    async def _fetch_stream(self, request_id: str) -> str:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{self.webhook_proxy_url}/listen/{request_id}") as response:
+                message = ""
+                async for chunk in response.content.iter_any():
+                    decoded_chunk = chunk.decode()
+                    if decoded_chunk == "data: keep-alive\n\n":
+                        continue
+                    data_and_eot = decoded_chunk.split("\n\n")
+                    data_chunk = data_and_eot[0]
+                    resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
                     try:
-                        stream = requests.get(f"{self.webhook_proxy_url}/listen/{request_id}", stream=True)
-                        open_streams.append(stream)
-                        break  # Exit retry loop on success
-                    except requests.RequestException as e:
-                        if attempt < max_retries - 1:
-                            time.sleep(retry_delay)  # Wait before retrying
-                        else:
-                            print(f"Failed to open stream for request_id {request_id} after {max_retries} attempts: {e}")
-                            open_streams.append(None)  # Append None to maintain index consistency
+                        resp = json.loads(resp_str)
+                        message = resp["data"]["choices"][0]["message"]["content"].strip()
+                    except json.JSONDecodeError as e:
+                        logging.warning(f"Failed to parse JSON for request_id {request_id}: {e}")
+                        continue
+                    if len(data_and_eot) > 1 and "\n\ndata: eot" in data_and_eot[1]:
+                        break
+                return message
 
-            # Default to "" for eval parser to add failed feedback response (-1)
-            batch_messages = ["" for _ in range(len(batch_ids))]
+    async def _async_fetch_response(self, request_messages: Dict[str, Any]) -> str:
+        request_id = await self._make_request(request_messages)
+        return await asyncio.wait_for(self._fetch_stream(request_id), timeout=120)  # 2 minutes timeout
 
-            # Handle streams concurrently
-            while any(open_streams):
-                for index, stream in enumerate(open_streams):
-                    if stream is None:
-                        continue  # Skip streams that failed to open
-
-                    try:
-                        for chunk in stream.iter_content(chunk_size=None):
-                            if not chunk:
-                                raise StopIteration()
-                            elif chunk.decode() == "data: keep-alive\n\n":
-                                continue
-                            else:
-                                decoded_chunk = chunk.decode()
-                                data_and_eot = decoded_chunk.split("\n\n")
-                                data_chunk = data_and_eot[0]
-                                resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
-                                
-                                try:
-                                    resp = json.loads(resp_str)
-                                    batch_messages[index] = resp["data"]["choices"][0]["message"]["content"].strip()
-                                except Exception as e:
-                                    # raise? warn?
-                                    continue
-
-                                if len(data_and_eot) > 1 and "\n\ndata: eot" in data_and_eot[1]:
-                                    stream.close()
-                                    open_streams[index] = None
-
-                    except (StopIteration, requests.RequestException) as e:
-                        open_streams[index] = None
-                        stream.close()
-
-                # Remove closed or failed streams
-                open_streams = [s for s in open_streams if s is not None]
-
-            all_messages.extend(batch_messages)
-
-        return all_messages
+    async def _async_fetch_batched_response(self, request_messages: List[Dict[str, Any]]) -> List[str]:
+        request_ids = await asyncio.gather(*[self._make_request(message) for message in request_messages])
+        tasks = [self._fetch_stream(request_id) for request_id in request_ids]
+        results = await asyncio.gather(*[asyncio.wait_for(task, timeout=120) for task in tasks], return_exceptions=True)
+        return [result if not isinstance(result, Exception) else "" for result in results]

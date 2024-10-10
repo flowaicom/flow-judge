@@ -1,9 +1,9 @@
 import logging
 
-from typing import Any
+from typing import Any, Coroutine, List, Dict
 
 from .adapters.baseten.deploy import ensure_model_deployment, get_deployed_model_id
-from .common import BaseFlowJudgeModel, VllmGenerationParams, ModelType, ModelConfig
+from .common import BaseFlowJudgeModel, VllmGenerationParams, ModelType, ModelConfig, AsyncBaseFlowJudgeModel
 from .adapters.baseten.adapter import BaseAPIAdapter,BasetenAPIAdapter, AsyncBasetenAPIAdapter
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class BasetenModelConfig(ModelConfig):
         self.exec_async = exec_async
 
 
-class Baseten(BaseFlowJudgeModel):
+class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge Model class for Baseten sync and webhook async operations.
     
     Arguments:
@@ -80,11 +80,14 @@ class Baseten(BaseFlowJudgeModel):
 
         logger.info("Successfully initialized Baseten!")
 
+    def _format_conversation(self, prompt: str) -> List[Dict[str, Any]]:
+        return [{"role": "user", "content": prompt.strip()}]
+
     def _generate(self, prompt: str) -> str:
         logger.info("Initiating single Baseten request")
 
-        conversation = [{"role": "user", "content": prompt.strip()}]
-        return self.api_adapter.fetch_response(conversation)
+        conversation = self._format_conversation(prompt)
+        return self.api_adapter._fetch_response(conversation)
 
     def _batch_generate(
             self, 
@@ -94,8 +97,26 @@ class Baseten(BaseFlowJudgeModel):
         ) -> list[str]:
         logger.info("Initiating batched Baseten requests")
 
-        conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
-        return self.api_adapter.fetch_batched_response(conversations)
+        conversations = [self._format_conversation(prompt) for prompt in prompts]
+        return self.api_adapter._fetch_batched_response(conversations)
+    
+    async def _async_generate(self, prompt: str) -> str:
+        if self.config.exec_async:
+            conversation = self._format_conversation(prompt)
+            return await self.api_adapter._async_fetch_response(conversation)
+        else:
+            logger.error("Attempting to run an async request with a synchronous API adapter")
+    
+    async def _async_batch_generate(
+            self, 
+            prompts: list[str], 
+            use_tqdm: bool = True, 
+            **kwargs: Any) -> Coroutine[Any, Any, list[str]]:
+        if self.config.exec_async:
+            conversations = [self._format_conversation(prompt) for prompt in prompts]
+            return await self.api_adapter._async_fetch_batched_response(conversations)
+        else:
+            logger.error("Attempting to run an async request with a synchronous API adapter")
 
 
 class BasetenError(Exception):

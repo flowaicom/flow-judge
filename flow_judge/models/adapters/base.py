@@ -7,11 +7,11 @@ class BaseAPIAdapter(ABC):
         self.base_url = base_url
         
     @abstractmethod
-    def fetch_response(self, request_body: Dict[str, Any]) -> str:
+    def _fetch_response(self, request_body: Dict[str, Any]) -> str:
         """Generate a response based on the given request."""
         pass
 
     @abstractmethod
-    def fetch_batched_response(self, request_bodies: list[Dict[str, Any]]) -> list[str]:
+    def _fetch_batched_response(self, request_bodies: list[Dict[str, Any]]) -> list[str]:
         """Generate responses for multiple requests."""
         pass

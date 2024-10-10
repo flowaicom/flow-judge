@@ -45,3 +45,8 @@ output/
 
 # data
 data/
+
+.cache
+
+flake.nix
+flake.lock

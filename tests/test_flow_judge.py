@@ -6,7 +6,7 @@ import pytest
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.flow_judge import FlowJudge
 from flow_judge.metrics import RESPONSE_CORRECTNESS_BINARY, CustomMetric, RubricItem
-from flow_judge.models.base import BaseFlowJudgeModel
+from flow_judge.models.common import BaseFlowJudgeModel
 from flow_judge.utils.prompt_formatter import USER_PROMPT_TEMPLATE, format_rubric, format_vars
 
 
@@ -17,13 +17,21 @@ class MockFlowJudgeModel(BaseFlowJudgeModel):
         """Initialize the mock model."""
         super().__init__(model_id, model_type, generation_params)
 
-    def generate(self, prompt):
+    def _generate(self, prompt):
         """Generate a mock response."""
         return "<feedback>Test feedback</feedback>\n<score>1</score>"
 
-    def batch_generate(self, prompts, use_tqdm=True):
+    def _batch_generate(self, prompts, use_tqdm=True):
         """Generate mock responses for a list of prompts."""
         return ["<feedback>Test feedback</feedback>\n<score>1</score>" for _ in prompts]
+
+    def generate(self, prompt):
+        """Generate a mock response."""
+        return self._generate(prompt)
+
+    def batch_generate(self, prompts, use_tqdm=True):
+        """Generate mock responses for a list of prompts."""
+        return self._batch_generate(prompts, use_tqdm=use_tqdm)
 
 
 @pytest.fixture

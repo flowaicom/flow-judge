@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,7 +16,7 @@ authors = [
 license = {file = "LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache 2.0 License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 keywords = ["LM-judge", "evaluation", "LLMs", "AI", "benchmarking"]
@@ -27,6 +27,7 @@ dependencies = [
     "hf-transfer>=0.1.1",
     "ipykernel>=6.29.0",
     "ipywidgets>=8.1.0",
+    "tqdm>=4.66.1",
 ]
 
 [project.optional-dependencies]
@@ -36,20 +37,26 @@ dev = [
     "ruff",
     "black",
     "isort",
+    "pytest-cov",
+    "codecov",
 ]
 hf = [
-    "transformers>=4.44.2",
+    "transformers>=4.45.0",
     "torch>=2.3.0",
     "bitsandbytes>=0.41.0,<=0.42.0",
     "accelerate>=0.34.2",
 ]
-vllm = ["vllm>=0.6.0"]
+vllm = ["vllm>=0.6.2"]
+llamafile = [
+    "torch>=2.3.0",
+    "openai>=1.51.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"
 
 [tool.setuptools]
-packages = ["flow_judge"]
+packages = ["flow_judge", "flow_judge.integrations", "flow_judge.metrics", "flow_judge.models", "flow_judge.utils"]
 
 [tool.setuptools_scm]
 version_scheme = "python-simplified-semver"
@@ -74,3 +81,6 @@ target-version = ['py310']
 [tool.isort]
 profile = "black"
 line_length = 100
+
+[tool.bdist_wheel]
+universal = true

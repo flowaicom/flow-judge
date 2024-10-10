@@ -28,24 +28,35 @@ def write_results_to_disk(
     }
 
     metric_folder = os.path.join(output_dir, fmt_metric_name)
-    os.makedirs(metric_folder, exist_ok=True)
+    metadata_folder = os.path.join(metric_folder, f"metadata_{fmt_metric_name}_{fmt_model_id}")
+
+    # Create all necessary directories
+    os.makedirs(metadata_folder, exist_ok=True)
 
     base_filename = f"{fmt_metric_name}_{fmt_model_id}_{model_metadata['model_type']}_{timestamp}"
-    metadata_path = os.path.join(metric_folder, f"metadata_{base_filename}.jsonl")
+    metadata_path = os.path.join(metadata_folder, f"metadata_{base_filename}.json")
     results_path = os.path.join(metric_folder, f"results_{base_filename}.jsonl")
 
     # Write metadata file
-    with open(metadata_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(metadata) + "\n")
+    try:
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata) + "\n")
+    except IOError as e:
+        logger.error(f"Error writing metadata file: {e}")
+        raise
 
     # Write results file
-    with open(results_path, "w", encoding="utf-8") as f:
-        for input_data, eval_output in zip(eval_inputs, eval_outputs):
-            result = {
-                "sample": input_data.model_dump(),
-                "feedback": eval_output.feedback,
-                "score": eval_output.score,
-            }
-            f.write(json.dumps(result) + "\n")
+    try:
+        with open(results_path, "w", encoding="utf-8") as f:
+            for input_data, eval_output in zip(eval_inputs, eval_outputs):
+                result = {
+                    "sample": input_data.model_dump(),
+                    "feedback": eval_output.feedback,
+                    "score": eval_output.score,
+                }
+                f.write(json.dumps(result) + "\n")
+    except IOError as e:
+        logger.error(f"Error writing results file: {e}")
+        raise
 
     logger.info(f"Results saved to {results_path}")

@@ -70,6 +70,10 @@ Homepage = "https://github.com/flowaicom/flow-judge"
 
 [tool.setuptools]
 packages = ["flow_judge", "flow_judge.integrations", "flow_judge.metrics", "flow_judge.models", "flow_judge.utils"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"flow_judge.metrics" = ["_data/**/*.yaml", "_data/**/*.j2"]
 
 [tool.setuptools_scm]
 version_scheme = "python-simplified-semver"

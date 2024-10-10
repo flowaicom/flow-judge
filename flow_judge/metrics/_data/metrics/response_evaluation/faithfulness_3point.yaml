@@ -1,0 +1,14 @@
+name: response_faithfulness_3point
+description: Evaluates the faithfulness of a response to the provided context using a 3-point Likert scale
+criteria: Based on the provided context, assess how faithful and consistent the response is to the information given. Check if the response contains any fabricated or hallucinated content that cannot be supported by the context.
+rubric:
+  - score: 1
+    description: The response contains significant amount of fabricated information or unsupported claims that directly contradict or deviate from the given context. Major hallucinations are present that are not factual based on the context provided. The response introduces substantial new information, makes claims that cannot be inferred from the context, or presents ideas that are inconsistent with the given material. The level of unfaithfulness severely compromises the reliability and accuracy of the response.
+  - score: 2
+    description: The response is mostly faithful to the context, but contains some minor unsupported details or slight factual inconsistencies. While the overall message is supported, there are a few deviations that are not directly inferable from the strict context alone. These may include minor embellishments, slight exaggerations, or small details that, while not entirely contradictory, go somewhat beyond what the context explicitly supports. The response remains largely reliable, but with some caveats.
+  - score: 3
+    description: The response is completely faithful and consistent with the context provided. All details and claims are directly supported by the information given, without any hallucinated or fabricated content present. The response accurately represents only the facts in the context, making no unsupported claims or inferences. Any conclusions or interpretations are strictly based on the provided information, demonstrating complete faithfulness to the context. The response can be fully trusted as an accurate representation of the given material.
+required_inputs:
+  - query
+  - context
+required_output: response

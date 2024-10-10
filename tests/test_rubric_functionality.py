@@ -7,7 +7,7 @@ from click.testing import CliRunner
 from flow_judge.flow_judge import FlowJudge
 from flow_judge.models import Vllm
 from flow_judge.utils.cli import cli
-from flow_judge.utils.rubrics import (
+from flow_judge.utils.notebook import (
     create_judge_from_yaml,
     create_metric_from_template,
     display_rubric_request_form,
@@ -139,6 +139,6 @@ def test_is_notebook():
 
     This test checks that the is_notebook function returns False when run in a pytest environment.
     """
-    from flow_judge.utils.rubrics import is_notebook
+    from flow_judge.utils.notebook import is_notebook
 
     assert not is_notebook()  # This should return False when run in pytest

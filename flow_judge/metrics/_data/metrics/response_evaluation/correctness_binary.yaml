@@ -1,0 +1,12 @@
+name: response_correctness_binary
+description: Evaluates the correctness of a response in a binary manner
+criteria: Does the generated response accurately match the provided reference answer for the given query?
+rubric:
+  - score: 0
+    description: The response is incorrect or irrelevant. It either contains inaccurate information, fails to address the query adequately, or provides information that does not align with the reference answer. The response may be off-topic, incomplete, or contain significant errors that render it unsuitable as an answer to the given query.
+  - score: 1
+    description: The response is correct and relevant. It accurately addresses the query and aligns closely with the provided reference answer. The information presented is factual, complete, and directly pertinent to the question asked. While the wording may not be identical to the reference answer, the core content and meaning are equivalent, demonstrating a correct understanding and articulation of the required information.
+required_inputs:
+  - query
+  - reference_answer
+required_output: response

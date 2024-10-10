@@ -1,0 +1,18 @@
+name: response_faithfulness_5point
+description: Evaluates the faithfulness of a response to the provided context using a 5-point Likert scale
+criteria: Based on the given context, evaluate how consistent and faithful the generated response is to the context. The response should not contain any hallucinated or fabricated information that is not supported by the context.
+rubric:
+  - score: 1
+    description: The response is completely inconsistent with the provided context. It contains significant amount of hallucinated or fabricated information that directly contradicts or is not supported at all by the context. The response introduces major claims, facts, or ideas that have no basis in the given information. It demonstrates a severe lack of faithfulness to the context, potentially leading to complete misunderstanding or misinformation.
+  - score: 2
+    description: The response is mostly inconsistent with the provided context. While it may contain some information from the context, it introduces a substantial amount of hallucinated or fabricated details that deviate from the context. There are significant discrepancies between the response and the given information, with multiple instances of unsupported claims or contradictions. The overall faithfulness is poor, though some elements of accuracy may be present.
+  - score: 3
+    description: The response is somewhat consistent with the provided context. It includes a mix of information from the context and some hallucinated or fabricated details. The fabrications are minor and do not significantly contradict the context, but they do extend beyond what can be directly inferred. The response maintains a basic level of faithfulness, but with noticeable deviations that require caution when interpreting the information.
+  - score: 4
+    description: The response is mostly consistent with the provided context. The vast majority of the content is supported by the context, with only minor and inconsequential inconsistencies or fabrications, if any. Any deviations from the context are subtle and do not materially affect the overall message or accuracy of the response. The response demonstrates a high degree of faithfulness, with only slight room for improvement.
+  - score: 5
+    description: The response is completely consistent with and faithful to the provided context. All details in the response are directly supported by the context, without any hallucinated or fabricated information. The response accurately represents the given information, making only claims and inferences that are fully justified by the context. It demonstrates perfect faithfulness, ensuring that all information presented can be traced back to the original context without any embellishment or deviation.
+required_inputs:
+  - query
+  - context
+required_output: response

@@ -1,6 +1,6 @@
 import click
 
-from .rubrics import load_rubric_templates, request_rubric
+from .notebook import load_rubric_templates, request_rubric
 
 
 @click.group()

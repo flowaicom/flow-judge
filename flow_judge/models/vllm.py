@@ -199,7 +199,10 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 **kwargs,
             }
 
-            os.environ["HF_HOME"] = download_dir
+            if download_dir:
+                os.environ["HF_HOME"] = download_dir
+                engine_args["download_dir"] = download_dir
+
             if exec_async:
                 engine_args["disable_log_requests"] = kwargs.get("disable_log_requests", False)
                 self.engine = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(**engine_args))

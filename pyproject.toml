@@ -62,6 +62,9 @@ llamafile = [
     "openai>=1.51.0",
 ]
 
+[project.scripts]
+flow-judge = "flow_judge.utils.cli:cli"
+
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"
 

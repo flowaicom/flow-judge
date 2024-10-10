@@ -1,0 +1,14 @@
+name: response_correctness_3point
+description: Evaluates the correctness of a response using a 3-point Likert scale
+criteria: Based on the provided reference response, how well does the system's generated response match the correct answer to the given query?
+rubric:
+  - score: 1
+    description: The generated response does not match the reference response at all. It either fails to address the query or provides a completely incorrect answer. The information presented is irrelevant, inaccurate, or entirely misses the point of the question. Using this response would lead to a fundamental misunderstanding of the topic.
+  - score: 2
+    description: The generated response partially matches the reference response. It addresses the query but may contain some incorrect, irrelevant or incomplete information compared to the reference. While some aspects of the answer are correct, there are noticeable gaps, inaccuracies, or misinterpretations that prevent it from being fully correct. The response demonstrates a partial understanding of the topic but falls short of a comprehensive and accurate answer.
+  - score: 3
+    description: The generated response fully matches the reference response. It accurately and completely answers the query, containing all the relevant information from the reference without any incorrect or extraneous details. The response demonstrates a thorough understanding of the topic and provides a comprehensive answer that aligns perfectly with the reference. Any variations in wording or structure do not detract from the accuracy or completeness of the information presented.
+required_inputs:
+  - query
+  - reference_answer
+required_output: response

@@ -1,0 +1,12 @@
+name: article_objectivity
+description: Evaluates the objectivity and balance of an article
+criteria: Evaluate whether the article presents information in an unbiased manner by incorporating multiple perspectives fairly and avoiding partisan or one-sided reporting.
+rubric:
+  - score: 0
+    description: The article shows significant bias in its reporting. It either presents only one perspective or heavily favors a particular viewpoint. Alternative views are absent, minimized, or unfairly represented. The language used may be loaded or emotionally charged, and sources may be limited to those supporting a single perspective. The overall presentation lacks journalistic objectivity and balance.
+  - score: 1
+    description: The article demonstrates a commitment to unbiased reporting. It presents multiple perspectives on the topic, giving fair representation to different viewpoints. The language used is neutral and objective, avoiding loaded terms or emotional rhetoric. The article uses a diverse range of credible sources to support various perspectives. While minor imperfections may exist, the overall presentation maintains journalistic integrity, balance, and objectivity.
+required_inputs:
+  - user_instructions
+  - context
+required_output: article

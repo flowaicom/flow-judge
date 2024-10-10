@@ -1,0 +1,13 @@
+name: sub_query_coverage
+description: Evaluates the coverage and relevance of sub-queries generated from a main query
+criteria: Do the generated sub-queries provide sufficient breadth to cover all aspects of the main query?
+rubric:
+  - score: 1
+    description: The sub-queries lack breadth and fail to address multiple important aspects of the main query. They are either too narrow, focusing on only one or two dimensions of the question, or they diverge significantly from the main query's intent. Using these sub-queries alone would result in a severely limited exploration of the topic.
+  - score: 2
+    description: The sub-queries cover some aspects of the main query but lack comprehensive breadth. While they touch on several dimensions of the question, there are still noticeable gaps in coverage. Some important facets of the main query are either underrepresented or missing entirely. The sub-queries provide a partial, but incomplete, exploration of the topic.
+  - score: 3
+    description: The sub-queries demonstrate excellent breadth, effectively covering all major aspects of the main query. They break down the main question into a diverse set of dimensions, ensuring a comprehensive exploration of the topic. Each significant facet of the main query is represented in the sub-queries, allowing for a thorough and well-rounded investigation of the subject matter.
+required_inputs:
+  - query
+required_output: sub_queries

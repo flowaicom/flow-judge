@@ -1,0 +1,14 @@
+name: response_relevance_3point
+description: Evaluates the relevance of a response to the given query using a 3-point Likert scale
+criteria: How relevant and pertinent is the response to addressing the given query, without including extraneous or irrelevant information?
+rubric:
+  - score: 1
+    description: The response is not relevant to the query at all. It either does not address the key points of the query or includes only irrelevant or extraneous information that does not pertain to answering the query directly. The response may be entirely off-topic, focus on unrelated aspects, or provide information that has no bearing on the question asked. It fails to provide any useful or pertinent information in relation to the query, rendering it ineffective as an answer.
+  - score: 2
+    description: The response addresses some aspects of the query but is only partially relevant. It may go off-topic or include some tangentially related or extraneous information. Key points needed to comprehensively address the query are missing. While the response contains some relevant information, it is mixed with irrelevant details or fails to fully capture the essence of the query. The partial relevance limits the effectiveness of the response in fully answering the question at hand.
+  - score: 3
+    description: The response is highly relevant to the query and directly addresses all the key points needed to comprehensively answer the query. No irrelevant or extraneous information is included. The response is fully pertinent to the query, focusing precisely on the aspects required to provide a complete and accurate answer. It demonstrates a clear understanding of the query's requirements and delivers information that is both relevant and comprehensive, without any unnecessary digressions or omissions.
+required_inputs:
+  - query
+  - context
+required_output: response

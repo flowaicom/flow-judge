@@ -1,0 +1,18 @@
+name: response_correctness_5point
+description: Evaluates the correctness of a response using a 5-point Likert scale
+criteria: Compare the system's response to the provided reference answer and rate how well they match in accuracy and completeness to answer the query.
+rubric:
+  - score: 1
+    description: The response is completely incorrect or irrelevant to the query, with no overlap in information with the reference answer. It fails to address the question entirely or provides information that is entirely unrelated or contradictory to the correct answer. Using this response would lead to a complete misunderstanding of the topic.
+  - score: 2
+    description: The response contains some correct information relevant to the query but is substantially incomplete or inaccurate compared to the reference answer. While there may be elements of truth, the majority of the response is either incorrect, missing crucial information, or so poorly articulated that it fails to effectively answer the query. The inaccuracies or omissions significantly impair the usefulness of the response.
+  - score: 3
+    description: The response answers the query with reasonable accuracy but is missing key details or has minor inaccuracies compared to the reference. It demonstrates a basic understanding of the topic and provides some correct information, but falls short of a comprehensive answer. The response may lack depth, omit important nuances, or contain minor errors that, while not completely undermining the answer, detract from its overall quality and completeness.
+  - score: 4
+    description: The response accurately answers the query and is nearly complete, only leaving out non-essential details compared to the reference. It demonstrates a strong understanding of the topic and provides a thorough answer that covers all major points. Any omissions are minor and do not significantly impact the overall quality or usefulness of the response. The information presented is accurate and well-articulated, with only minor room for improvement in terms of completeness or detail.
+  - score: 5
+    description: The response perfectly matches the accuracy and level of detail of the reference answer, containing all key information to comprehensively answer the query. It demonstrates a complete and nuanced understanding of the topic, providing a response that is indistinguishable in quality and content from the reference answer. All relevant details, including subtle points or exceptions, are accurately presented. The response leaves no room for improvement in terms of accuracy, completeness, or relevance to the query.
+required_inputs:
+  - query
+  - reference_answer
+required_output: response

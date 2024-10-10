@@ -1,0 +1,12 @@
+name: article_completeness
+description: Evaluates the completeness of an article based on provided instructions and context
+criteria: Evaluate the extent to which the article provides comprehensive coverage of all topics, key points, and information specified in the instructions, ensuring that no relevant aspects are omitted or inadequately addressed.
+rubric:
+  - score: 0
+    description: The article fails to provide comprehensive coverage of the required topics, key points, and information specified in the instructions. It omits crucial information and has significant gaps in addressing relevant aspects.
+  - score: 1
+    description: The article offers comprehensive coverage of all required topics, key points, and information specified in the instructions. It thoroughly addresses all relevant aspects, providing in-depth information and leaving no significant gaps in coverage.
+required_inputs:
+  - user_instructions
+  - context
+required_output: article

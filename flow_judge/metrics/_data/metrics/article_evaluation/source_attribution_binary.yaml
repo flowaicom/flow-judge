@@ -1,0 +1,12 @@
+name: article_source_attribution
+description: Evaluates the accuracy and comprehensiveness of source attribution in an article
+criteria: Does the article accurately and comprehensively attribute information to reliable sources, ensuring that these sources align with those provided in the information and instructions?
+rubric:
+  - score: 0
+    description: The article fails to accurately and comprehensively attribute information to reliable sources. There are significant gaps or inaccuracies in attribution, and many sources either do not align with those provided in the instructions or are unreliable. Attribution practices are inconsistent or inadequate, with key information often lacking proper sourcing.
+  - score: 1
+    description: The article accurately and comprehensively attributes information to reliable sources that align with those provided in the information and instructions. Attribution practices are consistently followed throughout the article, with all key information properly sourced and credited. The sourcing is appropriate and demonstrates excellent adherence to attribution standards.
+required_inputs:
+  - user_instructions
+  - context
+required_output: article

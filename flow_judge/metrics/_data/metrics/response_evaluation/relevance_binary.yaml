@@ -1,0 +1,12 @@
+name: response_relevance_binary
+description: Evaluates the relevance of a response to the given query in a binary manner
+criteria: Is the response directly relevant to answering the query considering the context, without including irrelevant or extraneous information?
+rubric:
+  - score: 0
+    description: The response does not sufficiently address the query, either by failing to directly answer the question asked, going off-topic, or including irrelevant or extraneous information that was not requested in the original query. The response may contain accurate information, but it does not align with the specific requirements of the query. It might focus on tangential aspects, provide unnecessary background, or delve into unrelated topics. As a result, the response fails to provide a clear, focused answer to the question at hand.
+  - score: 1
+    description: The response directly and sufficiently addresses the query. All of the content is relevant to answering the question asked, without going off-topic or providing unnecessary additional information beyond what the query requires. The response maintains a clear focus on the specific aspects highlighted in the query, providing a concise and pertinent answer. It avoids extraneous details or tangential information, ensuring that every part of the response contributes directly to addressing the question at hand.
+required_inputs:
+  - query
+  - context
+required_output: response

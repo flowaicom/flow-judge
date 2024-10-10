@@ -44,7 +44,7 @@ dev = [
     "types-tqdm",
     "memray>=1.14.0",
     "pytest-memray>=1.7.0",
-    "pytest-asyncio>=0.24.0",
+    "pytest-asyncio>=0.23.6, <0.24.0",
 ]
 integrations-test = [
     "llama-index",
@@ -60,6 +60,10 @@ vllm = ["vllm>=0.6.2"]
 llamafile = [
     "torch>=2.3.0",
     "openai>=1.51.0",
+]
+baseten = [
+    "truss>=0.9.42",
+    "openai>=1.51.0"
 ]
 
 [project.urls]

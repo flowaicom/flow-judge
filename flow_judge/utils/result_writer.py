@@ -17,7 +17,12 @@ def write_results_to_disk(
     metric_name: str,
     output_dir: str,
 ):
-    """Write evaluation results, inputs, and metadata to separate JSONL files."""
+    """Write evaluation results, inputs, and metadata to separate JSONL files.
+
+    Warning:
+        The `eval_inputs` and `eval_outputs` lists must have the same length.
+        If they don't, a ValueError will be raised during the writing process.
+    """
     fmt_metric_name = re.sub(r"\s", "_", re.sub(r"\(|\)", "", metric_name.lower()))
     fmt_model_id = model_metadata["model_id"].replace("/", "__")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%f")[:-3]
@@ -41,21 +46,21 @@ def write_results_to_disk(
     try:
         with open(metadata_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(metadata) + "\n")
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error writing metadata file: {e}")
         raise
 
     # Write results file
     try:
         with open(results_path, "w", encoding="utf-8") as f:
-            for input_data, eval_output in zip(eval_inputs, eval_outputs):
+            for input_data, eval_output in zip(eval_inputs, eval_outputs, strict=True):
                 result = {
                     "sample": input_data.model_dump(),
                     "feedback": eval_output.feedback,
                     "score": eval_output.score,
                 }
                 f.write(json.dumps(result) + "\n")
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error writing results file: {e}")
         raise
 

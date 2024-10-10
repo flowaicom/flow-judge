@@ -31,7 +31,7 @@
     <img src="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml/badge.svg" alt="Build">
 </a>
 <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
-    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/feat%2Fllamafile/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
+    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/main/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">
 </a>
 <a href="https://github.com/flowaicom/flow-judge/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/static/v1?label=license&message=Apache%202.0&color=white" alt="License">

@@ -39,6 +39,16 @@ dev = [
     "isort",
     "pytest-cov",
     "codecov",
+    "mypy>=1.11.2",
+    "types-requests",
+    "types-tqdm",
+    "memray>=1.14.0",
+    "pytest-memray>=1.7.0",
+    "pytest-asyncio>=0.24.0",
+]
+integrations-test = [
+    "llama-index",
+    "llama-index-embeddings-huggingface"
 ]
 hf = [
     "transformers>=4.45.0",
@@ -63,6 +73,7 @@ version_scheme = "python-simplified-semver"
 
 [tool.ruff]
 line-length = 100
+include = ["flow_judge/**/*.py", "tests/**/*.py", "setup.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C", "D"]
@@ -76,11 +87,31 @@ convention = "google"
 
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ['py311']
+include = '(flow_judge/.*\.py$|tests/.*\.py$|setup\.py)'
 
 [tool.isort]
 profile = "black"
 line_length = 100
+src_paths = ["flow_judge", "tests"]
+
+[tool.mypy]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 
 [tool.bdist_wheel]
 universal = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: mark test as an asyncio coroutine",
+    "memray: marks tests to be run with memray profiling",
+    "e2e: marks end-to-end tests",
+]

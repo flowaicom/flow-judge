@@ -9,7 +9,7 @@ Below is the current test coverage visualization for the Flow Judge project:
 
 <p align="center">
   <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
-    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/feat%2Fllamafile/graphs/sunburst.svg?token=AEGC7W3DGE" alt="Codecov Sunburst Graph">
+    <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/main/graphs/sunburst.svg?token=AEGC7W3DGE" alt="Codecov Sunburst Graph">
   </a>
 </p>
 

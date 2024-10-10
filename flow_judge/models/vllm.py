@@ -195,11 +195,13 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 "gpu_memory_utilization": config.gpu_memory_utilization,
                 "max_num_seqs": config.max_num_seqs,
                 "quantization": "awq_marlin" if config.quantization else None,
-                "download_dir": download_dir,  # FIXME: fix arg passing
                 **kwargs,
             }
 
-            os.environ["HF_HOME"] = download_dir
+            if download_dir:
+                os.environ["HF_HOME"] = download_dir
+                engine_args["download_dir"] = download_dir
+
             if exec_async:
                 engine_args["disable_log_requests"] = kwargs.get("disable_log_requests", False)
                 self.engine = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(**engine_args))

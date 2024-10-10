@@ -12,6 +12,6 @@ class BaseAPIAdapter(ABC):
         pass
 
     @abstractmethod
-    def fetch_batched_response(self, request_bodies: list[Dict[str, any]]) -> list[str]:
+    def fetch_batched_response(self, request_bodies: list[Dict[str, Any]]) -> list[str]:
         """Generate responses for multiple requests."""
         pass

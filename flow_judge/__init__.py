@@ -45,6 +45,12 @@ try:
 except ImportError:
     Llamafile = None
 
+try:
+    from flow_judge.models.baseten import Baseten
+    __all__.append("Baseten")
+except ImportError:
+    Baseten = None
+
 def get_available_models():
     """Return a list of available model classes based on installed extras."""
     models = [BaseFlowJudgeModel]
@@ -54,6 +60,8 @@ def get_available_models():
         models.append(Vllm)
     if Llamafile is not None:
         models.append(Llamafile)
+    if Baseten is not None:
+        models.append(Baseten)
     return models
 
 __all__.append("get_available_models")

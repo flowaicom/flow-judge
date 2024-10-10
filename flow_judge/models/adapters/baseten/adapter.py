@@ -5,7 +5,7 @@ import requests
 
 from typing import Any, Dict
 
-from .base import BaseAPIAdapter
+from ..base import BaseAPIAdapter
 
 class BasetenAPIAdapter(BaseAPIAdapter):
     """API utility class to execute sync requests from Baseten remote model hosting."""

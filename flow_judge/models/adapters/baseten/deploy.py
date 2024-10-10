@@ -25,7 +25,7 @@ def _initialize_model() -> bool:
 
     truss_path = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
     try:
-        truss.push(truss_path, promote=False, publish=False, trusted=True)
+        truss.push(truss_path, promote=True, publish=False, trusted=True)
         logger.info("Flow Judge Baseten deployment successful")
         return True
     except ApiError:

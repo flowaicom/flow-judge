@@ -27,8 +27,8 @@
 <a href="https://www.youtube.com/@flowaicom" target="_blank">
     <img alt="YouTube Channel Views" src="https://img.shields.io/youtube/channel/views/UCo2qL1nIQRHiPc0TF9xbqwg?style=social">
 </a>
-<a href="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml" target="_blank">
-    <img src="https://github.com/flowaicom/flow-judge/actions/workflows/python-package.yml/badge.svg" alt="Build">
+<a href="https://github.com/flowaicom/flow-judge/actions/workflows/test-and-lint.yml" target="_blank">
+    <img src="https://github.com/flowaicom/flow-judge/actions/workflows/test-and-lint.yml/badge.svg" alt="Build">
 </a>
 <a href="https://codecov.io/gh/flowaicom/flow-judge" target="_blank">
     <img src="https://codecov.io/gh/flowaicom/flow-judge/branch/main/graph/badge.svg?token=AEGC7W3DGE" alt="Code coverage">

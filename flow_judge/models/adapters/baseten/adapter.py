@@ -1,62 +1,64 @@
 import os
 import json
-import openai
 import requests
 import asyncio
 import aiohttp
 import logging
 
 from typing import Any, Dict, List
-from openai import OpenAIError
 
 from ..base import BaseAPIAdapter
+
 
 logger = logging.getLogger(__name__)
 
 class BasetenAPIAdapter(BaseAPIAdapter):
     """API utility class to execute sync requests from Baseten remote model hosting."""
     def __init__(self, baseten_model_id: str):
-        base_url = f"https://model-{baseten_model_id}.api.baseten.co/production"
-        super().__init__(base_url)
-        openai.base_url = base_url
+        super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
 
         self.baseten_model_id = baseten_model_id
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
-            openai.api_key = self.baseten_api_key
         except KeyError:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.")
 
     def _make_request(self, request_messages: Dict[str, Any]) -> Dict:
         try:
-            completion = openai.chat.completions.create(
-                messages=request_messages
+            resp = requests.post(
+                url=self.base_url + "/predict",
+                headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
+                json=request_messages
             )
-            return completion
-        
-        except OpenAIError as e:
-            logger.warning(f"Model request failed: {e}")
+
+            return resp.json()
         except Exception as e:
             logger.warning(f"An unexpected error occurred: {e}")
 
     def _fetch_response(self, request_messages: Dict[str, Any]) -> str:
         request_body = {"messages": request_messages}
-        completion = self._make_request(request_body)
+        parsed_resp = self._make_request(request_body)
 
         try:
-            message = completion.choices[0].message.content.strip()
+            message = parsed_resp["choices"][0]["message"]["content"].strip()
             return message
         except Exception as e:
             logger.warning(f"Failed to parse model response: {e}")
-            logger.warning("Returning default value")
+            logger.warning(f"Returning default value {parsed_resp}")
             return ""
         
     def _fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
         outputs = []
         for message in request_messages:
             request_body = {"messages": message}
-            completion = self._make_request(request_body)
-            outputs.append(completion.choices[0].message.content.strip())
+            parsed_resp = self._make_request(request_body)
+            try:
+                message = parsed_resp["choices"][0]["message"]["content"].strip()
+                outputs.append(message)
+            except Exception as e:
+                logger.warning(f"Failed to parse model response: {e}")
+                logger.warning("Returning default value")
+                outputs.append("")
         return outputs
 
 class AsyncBasetenAPIAdapter(BaseAPIAdapter):
@@ -92,6 +94,8 @@ class AsyncBasetenAPIAdapter(BaseAPIAdapter):
                     decoded_chunk = chunk.decode()
                     if decoded_chunk == "data: keep-alive\n\n":
                         continue
+                    if decoded_chunk == "data: server-gone\n\n":
+                        break
                     data_and_eot = decoded_chunk.split("\n\n")
                     data_chunk = data_and_eot[0]
                     resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk

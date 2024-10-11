@@ -32,10 +32,12 @@ model_metadata:
     max_model_len: 8192
     tensor_parallel_size: 1
 requirements:
-  - vllm==0.5.4
+  - vllm>=0.6.2
   - vllm-flash-attn
 resources:
   accelerator: A10G
   use_gpu: true
 runtime:
   predict_concurrency: 128
+secrets:
+  hf_access_token: hf_xyz

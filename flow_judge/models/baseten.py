@@ -44,7 +44,7 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             )
         
         baseten_model_id = get_deployed_model_id()
-
+        
         if not baseten_model_id:
             raise BasetenError(
                 status_code=2,

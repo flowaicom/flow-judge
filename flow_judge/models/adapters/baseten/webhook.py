@@ -35,7 +35,8 @@ def ensure_baseten_webhook_secret():
 
     stored_secret = _get_stored_secret()
     if stored_secret is not None:
-        return stored_secret
+        os.environ["BASETEN_WEBHOOK_SECRET"] = stored_secret
+        return True
 
     print(
         "To run Flow Judge remotely with Baseten \033[1mand enable async execution\033[0m,"

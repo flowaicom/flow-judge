@@ -7,8 +7,11 @@ import logging
 from typing import Any, Dict, List
 from openai import OpenAI, OpenAIError
 
-from ..base import BaseAPIAdapter
+from ..base import BaseAPIAdapter, AsyncBaseAPIAdapter
+from .validation import validate_baseten_signature
+from ..baseten.webhook import ensure_baseten_webhook_secret
 
+BATCH_SIZE = 4
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +19,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
     """API utility class to execute sync requests from Baseten remote model hosting."""
     def __init__(self, baseten_model_id: str):
         self.baseten_model_id = baseten_model_id
+
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError:
@@ -65,12 +69,16 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             outputs.append(completion.choices[0].message.content.strip())
         return outputs
 
-class AsyncBasetenAPIAdapter(BaseAPIAdapter):
+class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
     """Async webhook requests for the Baseten remote model"""
     def __init__(self, baseten_model_id: str, webhook_proxy_url: str):
         super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
         self.baseten_model_id = baseten_model_id
         self.webhook_proxy_url = webhook_proxy_url
+
+        if not ensure_baseten_webhook_secret():
+            raise ValueError("BASETEN_WEBHOOK_SECRET is not provided in the environment.")
+
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError:
@@ -80,45 +88,83 @@ class AsyncBasetenAPIAdapter(BaseAPIAdapter):
         model_input = {"messages": request_messages}
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                url=self.base_url + "/async_predict",
+                url=self.base_url.rstrip("/") + "/async_predict",
                 headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
                 json={
-                    "webhook_endpoint": self.webhook_proxy_url + "/webhook",
+                    "webhook_endpoint": self.webhook_proxy_url.rstrip("/") + "/webhook",
                     "model_input": model_input
                 }
             ) as response:
                 resp_json = await response.json()
-                return resp_json["request_id"]
+
+                try:
+                    return resp_json["request_id"]
+                except KeyError as e:
+                    if "error" in resp_json:
+                        error_msg = resp_json["error"]
+                        logger.error(f"Baseten request failed. {error_msg}")
+
+                    logger.error(f"Unable to parse Baseten response: {e}")
+                    return None
 
     async def _fetch_stream(self, request_id: str) -> str:
+        if request_id is None:
+            return ""
         async with aiohttp.ClientSession() as session:
             async with session.get(f"{self.webhook_proxy_url}/listen/{request_id}") as response:
                 message = ""
-                async for chunk in response.content.iter_any():
-                    decoded_chunk = chunk.decode()
-                    if decoded_chunk == "data: keep-alive\n\n":
-                        continue
-                    if decoded_chunk == "data: server-gone\n\n":
-                        break
-                    data_and_eot = decoded_chunk.split("\n\n")
-                    data_chunk = data_and_eot[0]
-                    resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
-                    try:
-                        resp = json.loads(resp_str)
-                        message = resp["data"]["choices"][0]["message"]["content"].strip()
-                    except json.JSONDecodeError as e:
-                        logging.warning(f"Failed to parse JSON for request_id {request_id}: {e}")
-                        continue
-                    if len(data_and_eot) > 1 and "\n\ndata: eot" in data_and_eot[1]:
-                        break
-                return message
+                signature = ""
+
+                try:
+                    async for chunk in response.content.iter_any():
+                        decoded_chunk = chunk.decode()
+
+                        if decoded_chunk == "data: keep-alive\n\n":
+                            continue
+                        if decoded_chunk == "data: server-gone\n\n":
+                            break
+
+                        data_and_eot = decoded_chunk.split("\n\n")
+                        data_chunk = data_and_eot[0]
+                        signature = data_and_eot[1].split("data: signature=")[1]
+
+                        resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
+                        
+                        try:
+                            resp = json.loads(resp_str)
+                            message = resp["data"]["choices"][0]["message"]["content"].strip()
+                        except json.JSONDecodeError as e:
+                            logging.warning(f"Failed to parse JSON for request_id {request_id}: {e}")
+                            continue
+
+                        if message != "":
+                            if not validate_baseten_signature(resp, signature):
+                                message = ""
+
+                        if len(data_and_eot) > 2 and "data: eot" in data_and_eot[2]:
+                            break
+                    
+                    return message
+                
+                except (TimeoutError, asyncio.CancelledError) as e:
+                    logger.error(f"Request timed out for request_id: {request_id}")
+                    return message
+                except Exception as e:
+                    logger.error(
+                        f"Unknown exception occurred for request_id: {request_id}"
+                        f"{e}"
+                    )
 
     async def _async_fetch_response(self, request_messages: Dict[str, Any]) -> str:
         request_id = await self._make_request(request_messages)
         return await asyncio.wait_for(self._fetch_stream(request_id), timeout=120)  # 2 minutes timeout
 
     async def _async_fetch_batched_response(self, request_messages: List[Dict[str, Any]]) -> List[str]:
-        request_ids = await asyncio.gather(*[self._make_request(message) for message in request_messages])
-        tasks = [self._fetch_stream(request_id) for request_id in request_ids]
-        results = await asyncio.gather(*[asyncio.wait_for(task, timeout=120) for task in tasks], return_exceptions=True)
-        return [result if not isinstance(result, Exception) else "" for result in results]
+        batches = [request_messages[i:i+BATCH_SIZE] for i in range(0, len(request_messages), BATCH_SIZE)]
+        results = []
+        for batch in batches:
+            request_ids = await asyncio.gather(*[self._make_request(message) for message in batch])
+            tasks = [self._fetch_stream(request_id) for request_id in request_ids]
+            batch_results = await asyncio.gather(*[asyncio.wait_for(task, timeout=120) for task in tasks], return_exceptions=True)
+            results.extend([result if not isinstance(result, Exception) else "" for result in batch_results])
+        return results

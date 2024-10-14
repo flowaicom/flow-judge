@@ -1,5 +1,4 @@
 import os
-import json
 import hmac
 import hashlib
 import logging
@@ -38,21 +37,21 @@ def validate_baseten_signature(
             )
         return False
     
+    async_predict_result = AsyncPredictResult(**result)
+
     if (datetime.now(timezone.utc) - async_predict_result.time
     ).total_seconds() > TIMESTAMP_TOLERANCE_SECONDS:
         logger.error(
             f"Async predict result was received after {TIMESTAMP_TOLERANCE_SECONDS} seconds and is considered stale, Baseten signature was not validated."
         )
         return False
-    
-    async_predict_result = AsyncPredictResult(**result).model_dump_json()
 
     for actual_signature in actual_signatures.replace("v1=","").split(","):
-        expected_signature = hmac.new(
+        expected_signature = hmac.digest(
             webhook_secret.encode("utf-8"),
-            async_predict_result.encode("utf-8"),
+            async_predict_result.model_dump_json().encode("utf-8"),
             hashlib.sha256,
-        ).hexdigest()
+        ).hex()
 
         if hmac.compare_digest(expected_signature, actual_signature):
             logger.info("Baseten signature is valid!")

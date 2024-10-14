@@ -23,9 +23,9 @@ def _initialize_model() -> bool:
         logger.info("Flow Judge already deployed")
         return True
 
-    truss_path = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+    truss_path = os.path.dirname(os.path.realpath(os.path.abspath(__file__))) + "/deployment"
     try:
-        deployment = truss.push(truss_path, promote=False, publish=False, trusted=True, environment=None)
+        deployment = truss.push(truss_path, promote=True, publish=False, trusted=True, environment=None)
         deployment.wait_for_active()
         logger.info("Flow Judge Baseten deployment successful")
         return True

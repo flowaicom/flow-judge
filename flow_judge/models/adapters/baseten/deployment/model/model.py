@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 import uuid
+import threading
 
 MAX_LENGTH = 1024
 TEMPERATURE = 0.1
@@ -12,7 +13,7 @@ DO_SAMPLE = True
 DEFAULT_STREAM = False
 
 import httpx
-from model.helper import run_background_vllm_health_check
+from model.helper import run_background_vllm_health_check, log_subprocess_output
 from transformers import AutoTokenizer
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
@@ -68,6 +69,10 @@ class Model:
             self._vllm_process = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
+
+            output_thread = threading.Thread(target=log_subprocess_output, args=(self._vllm_process,))
+            output_thread.daemon = True
+            output_thread.start()
 
             # Wait for 10 seconds and check if command fails
             time.sleep(10)

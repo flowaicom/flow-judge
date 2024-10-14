@@ -14,7 +14,8 @@ class BasetenModelConfig(ModelConfig):
             model_id: str, 
             generation_params: VllmGenerationParams,
             exec_async: bool = False,
-            webhook_proxy_url = None,
+            webhook_proxy_url: str = None,
+            async_batch_size: int = 128,
             **kwargs: Any
         ):        
         super().__init__(model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)
@@ -33,8 +34,9 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     def __init__(
             self,
             api_adapter: BaseAPIAdapter = None,
-            webhook_proxy_url = None,
+            webhook_proxy_url: str = None,
             exec_async: bool = False,
+            async_batch_size: int = 128,
             **kwargs: Any
         ):
         if not ensure_model_deployment():
@@ -54,6 +56,9 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         if exec_async and not webhook_proxy_url:
             raise ValueError("Webhook proxy url is required for async Baseten execution.")
         
+        if async_batch_size < 1:
+            raise ValueError("async_batch_size needs to be greater than 0.")
+        
         if api_adapter is not None and not isinstance(api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)):
             raise BasetenError(
                 status_code=3,
@@ -66,14 +71,15 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             else:
                 self.api_adapter = AsyncBasetenAPIAdapter(
                     baseten_model_id=baseten_model_id,
-                    webhook_proxy_url=webhook_proxy_url
+                    webhook_proxy_url=webhook_proxy_url,
+                    batch_size = async_batch_size
                 )
         else:
             self.api_adapter = api_adapter
 
         # default params
         generation_params = VllmGenerationParams()
-        config = BasetenModelConfig(baseten_model_id, generation_params, exec_async, webhook_proxy_url)
+        config = BasetenModelConfig(baseten_model_id, generation_params, exec_async, webhook_proxy_url, async_batch_size)
         self.config = config
 
         super().__init__(baseten_model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)

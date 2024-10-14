@@ -11,8 +11,6 @@ from ..base import BaseAPIAdapter, AsyncBaseAPIAdapter
 from .validation import validate_baseten_signature
 from ..baseten.webhook import ensure_baseten_webhook_secret
 
-BATCH_SIZE = 4
-
 logger = logging.getLogger(__name__)
 
 class BasetenAPIAdapter(BaseAPIAdapter):
@@ -71,10 +69,11 @@ class BasetenAPIAdapter(BaseAPIAdapter):
 
 class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
     """Async webhook requests for the Baseten remote model"""
-    def __init__(self, baseten_model_id: str, webhook_proxy_url: str):
+    def __init__(self, baseten_model_id: str, webhook_proxy_url: str, batch_size: int):
         super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
         self.baseten_model_id = baseten_model_id
         self.webhook_proxy_url = webhook_proxy_url
+        self.batch_size = batch_size
 
         if not ensure_baseten_webhook_secret():
             raise ValueError("BASETEN_WEBHOOK_SECRET is not provided in the environment.")
@@ -129,7 +128,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         signature = data_and_eot[1].split("data: signature=")[1]
 
                         resp_str = data_chunk.split("data: ")[1] if data_chunk.startswith("data: ") else data_chunk
-                        
+
                         try:
                             resp = json.loads(resp_str)
                             message = resp["data"]["choices"][0]["message"]["content"].strip()
@@ -154,13 +153,14 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         f"Unknown exception occurred for request_id: {request_id}"
                         f"{e}"
                     )
+                    return message
 
     async def _async_fetch_response(self, request_messages: Dict[str, Any]) -> str:
         request_id = await self._make_request(request_messages)
         return await asyncio.wait_for(self._fetch_stream(request_id), timeout=120)  # 2 minutes timeout
 
     async def _async_fetch_batched_response(self, request_messages: List[Dict[str, Any]]) -> List[str]:
-        batches = [request_messages[i:i+BATCH_SIZE] for i in range(0, len(request_messages), BATCH_SIZE)]
+        batches = [request_messages[i:i+self.batch_size] for i in range(0, len(request_messages), self.batch_size)]
         results = []
         for batch in batches:
             request_ids = await asyncio.gather(*[self._make_request(message) for message in batch])

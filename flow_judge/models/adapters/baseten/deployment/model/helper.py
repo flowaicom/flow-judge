@@ -9,6 +9,18 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_HEALTH_CHECK_INTERVAL = 5  # seconds
 
+def log_subprocess_output(process):
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            logger.info(f"vLLM subprocess stdout: {output.strip()}")
+    rc = process.poll()
+    if rc != 0:
+        for error_output in process.stderr.readlines():
+            logger.error(f"vLLM subprocess stderr: {error_output.strip()}")
+
 
 async def monitor_vllm_server_health(vllm_server_url, health_check_interval):
     assert vllm_server_url is not None, "vllm_server_url must not be None"

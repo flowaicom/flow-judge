@@ -38,8 +38,6 @@ def validate_baseten_signature(
         return False
       
     async_predict_result = AsyncPredictResult(**result)
-    
-    async_predict_result = AsyncPredictResult(**result)
 
     if (datetime.now(timezone.utc) - async_predict_result.time
     ).total_seconds() > TIMESTAMP_TOLERANCE_SECONDS:

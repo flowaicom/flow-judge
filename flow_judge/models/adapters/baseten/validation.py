@@ -36,6 +36,8 @@ def validate_baseten_signature(
             f"{e}"
             )
         return False
+      
+    async_predict_result = AsyncPredictResult(**result)
     
     async_predict_result = AsyncPredictResult(**result)
 

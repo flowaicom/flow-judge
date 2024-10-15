@@ -133,13 +133,11 @@ def test_baseten_model_config_init_valid(
         ({"model_id": None}, "model_id should not be empty"),
         (
             {"generation_params": None},
-            "generation_params should be an instance\
-      of VllmGenerationParams",
+            "generation_params should be an instance of VllmGenerationParams",
         ),
         (
             {"generation_params": {}},
-            "generation_params should be an instance\
-      of VllmGenerationParams",
+            "generation_params should be an instance of VllmGenerationParams",
         ),
     ],
 )
@@ -279,8 +277,7 @@ async def test_baseten_init_valid(monkeypatch: MonkeyPatch) -> None:
     # Test error cases
     with pytest.raises(
         ValueError,
-        match="Webhook proxy url is required for async\
-                        Baseten execution",
+        match="Webhook proxy url is required for async Baseten execution",
     ):
         Baseten(exec_async=True, async_batch_size=128)
 

@@ -133,6 +133,7 @@ class ModelType(Enum):
     VLLM_ASYNC = "vllm_async"
     LLAMAFILE = "llamafile"
     BASETEN_VLLM = "baseten_vllm"
+    BASETEN_VLLM_ASYNC = "baseten_vllm_async"
 
 
 class Engine(Enum):

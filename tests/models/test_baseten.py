@@ -1,13 +1,17 @@
 import logging
 import os
+import sys
 from collections.abc import Generator
+from io import StringIO
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from pytest import LogCaptureFixture, MonkeyPatch
 
+from flow_judge.models.adapters.baseten.deploy import ensure_model_deployment
 from flow_judge.models.baseten import (
     Baseten,
     BasetenError,
@@ -15,6 +19,137 @@ from flow_judge.models.baseten import (
     ModelType,
     VllmGenerationParams,
 )
+
+
+@pytest.fixture
+def capture_output() -> Generator[StringIO, None, None]:
+    """Capture stdout for testing print statements.
+
+    :yield: StringIO object containing captured output
+    """
+    captured_output = StringIO()
+    sys.stdout = captured_output
+    yield captured_output
+    sys.stdout = sys.__stdout__
+
+
+def test_ensure_model_deployment_key_exists(
+    monkeypatch: MonkeyPatch, caplog: LogCaptureFixture
+) -> None:
+    """Test ensure_model_deployment when BASETEN_API_KEY exists.
+
+    :param monkeypatch: pytest's monkeypatch fixture
+    :param caplog: pytest's log capture fixture
+    """
+    monkeypatch.setenv("BASETEN_API_KEY", "mock_api_key")
+
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "flow_judge.models.adapters.baseten.deploy._validate_auth_status", return_value=True
+        ):
+            with patch(
+                "flow_judge.models.adapters.baseten.deploy._initialize_model", return_value=True
+            ):
+                result = ensure_model_deployment()
+
+    assert result is True, "Model deployment should succeed when API key exists"
+    assert any(
+        "Baseten authenticated" in record.message for record in caplog.records
+    ), "Should log successful authentication"
+    assert any(
+        "Ensuring Flow Judge model deployment" in record.message for record in caplog.records
+    ), "Should log deployment attempt"
+
+
+def test_ensure_model_deployment_key_missing_non_interactive(
+    monkeypatch: MonkeyPatch, caplog: LogCaptureFixture
+) -> None:
+    """Test ensure_model_deployment when BASETEN_API_KEY is missing in non-interactive mode.
+
+    :param monkeypatch: pytest's monkeypatch fixture
+    :param caplog: pytest's log capture fixture
+    """
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+
+    captured_output = StringIO()
+    sys.stdout = captured_output
+
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "flow_judge.models.adapters.baseten.deploy._validate_auth_status", return_value=False
+        ):
+            with patch(
+                "flow_judge.models.adapters.baseten.deploy._is_interactive", return_value=False
+            ):
+                result = ensure_model_deployment()
+
+    sys.stdout = sys.__stdout__
+
+    assert result is False, "Model deployment should fail when API key is missing"
+    assert any(
+        "Baseten authentication failed" in record.message for record in caplog.records
+    ), "Should log failed authentication"
+    assert any(
+        "Non-interactive environment detected" in record.message for record in caplog.records
+    ), "Should detect non-interactive environment"
+
+    output = captured_output.getvalue()
+    assert "To run Flow Judge remotely with Baseten, signup and generate API key" in output
+    assert "Set the Baseten API key in `BASETEN_API_KEY` environment variable" in output
+
+
+def test_ensure_model_deployment_key_missing_interactive(
+    monkeypatch: MonkeyPatch, caplog: LogCaptureFixture
+) -> None:
+    """Test ensure_model_deployment when BASETEN_API_KEY is missing in interactive mode.
+
+    :param monkeypatch: pytest's monkeypatch fixture
+    :param caplog: pytest's log capture fixture
+    """
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+
+    captured_output = StringIO()
+    sys.stdout = captured_output
+
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "flow_judge.models.adapters.baseten.deploy._validate_auth_status",
+            side_effect=[False, True],
+        ):
+            with patch(
+                "flow_judge.models.adapters.baseten.deploy._is_interactive", return_value=True
+            ):
+                with patch(
+                    "flow_judge.models.adapters.baseten.deploy.getpass.getpass",
+                    return_value="mock_api_key",
+                ):
+                    with patch(
+                        "flow_judge.models.adapters.baseten.deploy.truss.login"
+                    ) as mock_login:
+                        with patch(
+                            "flow_judge.models.adapters.baseten.deploy._initialize_model",
+                            return_value=True,
+                        ):
+                            result = ensure_model_deployment()
+
+    sys.stdout = sys.__stdout__
+
+    assert result is True, "Model deployment should succeed after entering valid API key"
+    assert any(
+        "Baseten authentication failed" in record.message for record in caplog.records
+    ), "Should log initial failed authentication"
+    assert any(
+        "Prompting for API key in interactive environment" in record.message
+        for record in caplog.records
+    ), "Should prompt for API key"
+    assert any(
+        "Login successful" in record.message for record in caplog.records
+    ), "Should log successful login"
+
+    mock_login.assert_called_once_with("mock_api_key")
+
+    output = captured_output.getvalue()
+    assert "To run Flow Judge remotely with Baseten, signup and generate API key" in output
 
 
 @pytest.fixture(autouse=True)

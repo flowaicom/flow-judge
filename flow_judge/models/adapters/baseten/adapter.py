@@ -1,15 +1,15 @@
-import os
-import json
 import asyncio
-import aiohttp
+import json
 import logging
-
+import os
 from typing import Any, Dict, List
+
+import aiohttp
 from openai import OpenAI, OpenAIError
 
-from ..base import BaseAPIAdapter, AsyncBaseAPIAdapter
-from .validation import validate_baseten_signature
+from ..base import AsyncBaseAPIAdapter, BaseAPIAdapter
 from ..baseten.webhook import ensure_baseten_webhook_secret
+from .validation import validate_baseten_signature
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,8 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.")
-        
-        base_url = f"https://bridge.baseten.co/v1/direct"
+
+        base_url = "https://bridge.baseten.co/v1/direct"
         self.client = OpenAI(
             api_key=self.baseten_api_key,
             base_url=base_url
@@ -43,7 +43,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
                 }
             )
             return completion
-        
+
         except OpenAIError as e:
             logger.warning(f"Model request failed: {e}")
         except Exception as e:
@@ -59,7 +59,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             logger.warning(f"Failed to parse model response: {e}")
             logger.warning("Returning default value")
             return ""
-        
+
     def _fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
         outputs = []
         for message in request_messages:
@@ -142,10 +142,10 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
                         if len(data_and_eot) > 2 and "data: eot" in data_and_eot[2]:
                             break
-                    
+
                     return message
-                
-                except (TimeoutError, asyncio.CancelledError) as e:
+
+                except (TimeoutError, asyncio.CancelledError):
                     logger.error(f"Request timed out for request_id: {request_id}")
                     return message
                 except Exception as e:

@@ -1,9 +1,9 @@
 import logging
 import os
 import subprocess
+import threading
 import time
 import uuid
-import threading
 
 MAX_LENGTH = 1024
 TEMPERATURE = 0.1
@@ -13,12 +13,12 @@ DO_SAMPLE = True
 DEFAULT_STREAM = False
 
 import httpx
-from model.helper import run_background_vllm_health_check, log_subprocess_output
 from transformers import AutoTokenizer
+from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 
-from vllm import SamplingParams
+from model.helper import log_subprocess_output, run_background_vllm_health_check
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 

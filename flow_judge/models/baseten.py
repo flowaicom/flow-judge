@@ -1,23 +1,28 @@
 import logging
+from typing import Any, Coroutine, Dict, List
 
-from typing import Any, Coroutine, List, Dict
-
+from .adapters.baseten.adapter import AsyncBasetenAPIAdapter, BaseAPIAdapter, BasetenAPIAdapter
 from .adapters.baseten.deploy import ensure_model_deployment, get_deployed_model_id
-from .common import BaseFlowJudgeModel, VllmGenerationParams, ModelType, ModelConfig, AsyncBaseFlowJudgeModel
-from .adapters.baseten.adapter import BaseAPIAdapter,BasetenAPIAdapter, AsyncBasetenAPIAdapter
+from .common import (
+    AsyncBaseFlowJudgeModel,
+    BaseFlowJudgeModel,
+    ModelConfig,
+    ModelType,
+    VllmGenerationParams,
+)
 
 logger = logging.getLogger(__name__)
 
 class BasetenModelConfig(ModelConfig):
     def __init__(
-            self, 
-            model_id: str, 
+            self,
+            model_id: str,
             generation_params: VllmGenerationParams,
             exec_async: bool = False,
             webhook_proxy_url: str = None,
             async_batch_size: int = 128,
             **kwargs: Any
-        ):        
+        ):
         super().__init__(model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)
         self.webhook_proxy_url = webhook_proxy_url
         self.exec_async = exec_async
@@ -44,21 +49,21 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                 status_code=1,
                 message="Baseten deployment is not available."
             )
-        
+
         baseten_model_id = get_deployed_model_id()
-        
+
         if not baseten_model_id:
             raise BasetenError(
                 status_code=2,
                 message="Unable to retrieve Basten's deployed model id."
             )
-        
+
         if exec_async and not webhook_proxy_url:
             raise ValueError("Webhook proxy url is required for async Baseten execution.")
-        
+
         if async_batch_size < 1:
             raise ValueError("async_batch_size needs to be greater than 0.")
-        
+
         if api_adapter is not None and not isinstance(api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)):
             raise BasetenError(
                 status_code=3,
@@ -96,27 +101,27 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         return self.api_adapter._fetch_response(conversation)
 
     def _batch_generate(
-            self, 
-            prompts: list[str], 
-            use_tqdm: bool = True, 
+            self,
+            prompts: list[str],
+            use_tqdm: bool = True,
             **kwargs: Any
         ) -> list[str]:
         logger.info("Initiating batched Baseten requests")
 
         conversations = [self._format_conversation(prompt) for prompt in prompts]
         return self.api_adapter._fetch_batched_response(conversations)
-    
+
     async def _async_generate(self, prompt: str) -> str:
         if self.config.exec_async:
             conversation = self._format_conversation(prompt)
             return await self.api_adapter._async_fetch_response(conversation)
         else:
             logger.error("Attempting to run an async request with a synchronous API adapter")
-    
+
     async def _async_batch_generate(
-            self, 
-            prompts: list[str], 
-            use_tqdm: bool = True, 
+            self,
+            prompts: list[str],
+            use_tqdm: bool = True,
             **kwargs: Any) -> Coroutine[Any, Any, list[str]]:
         if self.config.exec_async:
             conversations = [self._format_conversation(prompt) for prompt in prompts]

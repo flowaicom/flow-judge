@@ -1,6 +1,6 @@
+import getpass
 import logging
 import os
-import getpass
 from typing import Optional
 
 from flow_judge.models.adapters.baseten.deploy import _is_interactive

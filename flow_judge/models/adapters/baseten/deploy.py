@@ -1,12 +1,11 @@
+import getpass
 import http
 import logging
 import os
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import requests
 import truss
-import getpass
-
 from truss.remote import remote_factory
 from truss.remote.baseten.error import ApiError
 

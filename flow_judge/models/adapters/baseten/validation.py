@@ -1,10 +1,10 @@
-import os
-import hmac
 import hashlib
+import hmac
 import logging
-
-from typing import List
+import os
 from datetime import datetime, timezone
+from typing import List
+
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def validate_baseten_signature(
             f"{e}"
             )
         return False
-      
+
     async_predict_result = AsyncPredictResult(**result)
 
     if (datetime.now(timezone.utc) - async_predict_result.time
@@ -56,7 +56,7 @@ def validate_baseten_signature(
         if hmac.compare_digest(expected_signature, actual_signature):
             logger.info("Baseten signature is valid!")
             return True
-        
+
     logger.error(
         "Baseten signature is not valid. Ensure your webhook secrets are properly configured."
     )

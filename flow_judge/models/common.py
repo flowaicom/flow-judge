@@ -74,10 +74,10 @@ class FlowJudgeRemoteModel(BaseFlowJudgeModel):
     ):
         """Initialize the FlowJudge remote model class.
 
-        : param model_id: The ID of the model.
-        : param model_type: Type of the model based on ModelType.
-        : param generation_params: Relevant generation params for the model type.
-        : paramm remote_kwargs: Keyword arguments to initialize the parameters.
+        :param model_id: The ID of the model.
+        :param model_type: Type of the model based on ModelType.
+        :param generation_params: Relevant generation params for the model type.
+        :param remote_kwargs: Keyword arguments to initialize the parameters.
         """
         super().__init__(model_id, model_type, generation_params, **remote_kwargs)
 

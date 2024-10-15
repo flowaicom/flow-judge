@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, List, Dict
+from typing import Any, Dict, List
 
 import aiohttp
 from openai import OpenAI, OpenAIError
@@ -22,6 +22,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
 
         :param baseten_model_id: The model_id designated for your deployment
             - Can be found on your Baseten dashboard: https://app.baseten.co/models
+        :raises ValueError: if BASETEN_API_KEY environment variable is missing.
         """
         self.baseten_model_id = baseten_model_id
 
@@ -79,12 +80,13 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
     def __init__(self, baseten_model_id: str, webhook_proxy_url: str, batch_size: int):
         """Initialize the async Baseten adapter.
 
-        : param baseten_model_id: The model_id designated for your deployment.
+        :param baseten_model_id: The model_id designated for your deployment.
             - Can be found on your Baseten dashboard: https://app.baseten.co/models
-        : param webhook_proxy_url: The webhook url for Baseten's response.
-        : param batch_size: The batch size of concurrent requests. (default 128)
+        :param webhook_proxy_url: The webhook url for Baseten's response.
+        :param batch_size: The batch size of concurrent requests. (default 128)
             - For optimization set size to concurrency_target * number_of_replicas
             - See: https://docs.baseten.co/performance/concurrency
+        :raises ValueError: if environment variables are missing.
         """
         super().__init__(f"https://model-{baseten_model_id}.api.baseten.co/production")
         self.baseten_model_id = baseten_model_id

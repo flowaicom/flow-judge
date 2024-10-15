@@ -301,11 +301,24 @@ async def test_baseten_init_valid(monkeypatch, caplog):
     with pytest.raises(ValueError, match="async_batch_size must be greater than 0"):
         Baseten(exec_async=False, async_batch_size=0)
 
-    with patch("flow_judge.models.baseten.ensure_model_deployment", return_value=False):
-        with pytest.raises(BasetenError, match="Baseten deployment is not available"):
+    with (
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=False),
+        patch("flow_judge.models.baseten.get_deployed_model_id", return_value=None),
+    ):
+        with pytest.raises(
+            BasetenError,
+            match=(
+                "Baseten deployment is not available. This could be due to API key issues, "
+                "network problems, or Baseten service unavailability. Please check your "
+                "API key, network connection, and Baseten service status."
+            ),
+        ):
             Baseten(exec_async=False, async_batch_size=128)
 
-    with patch("flow_judge.models.baseten.get_deployed_model_id", return_value=None):
+    with (
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+        patch("flow_judge.models.baseten.get_deployed_model_id", side_effect=[None, None]),
+    ):
         with pytest.raises(BasetenError, match="Unable to retrieve Baseten's deployed model id"):
             Baseten(exec_async=False, async_batch_size=128)
 

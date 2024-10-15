@@ -1,5 +1,4 @@
 import logging
-import warnings
 from collections.abc import Coroutine
 from typing import Any
 
@@ -78,34 +77,48 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         :raises BasetenError: If Baseten deployment or model ID retrieval fails.
         :raises ValueError: If input parameters are invalid.
         """
-        if not ensure_model_deployment():
-            raise BasetenError(status_code=1, message="Baseten deployment is not available.")
-
-        model_id = kwargs.pop("_model_id", None)
-        if model_id is None:
-            model_id = get_deployed_model_id()
-            if model_id is None:
-                raise BasetenError(
-                    status_code=2,
-                    message=(
-                        "Unable to retrieve Baseten's deployed model id. "
-                        "Please ensure the model is deployed or provide a custom '_model_id'."
-                    ),
-                )
-        else:
-            warnings.warn(
-                f"You have entered a custom Baseten model id: '{model_id}'. "
-                "Using other models may lead to unexpected behavior, and we do "
-                "not handle GitHub issues for unsupported models. Proceed with caution.",
-                UserWarning,
-                stacklevel=2,
-            )
-
         if exec_async and not webhook_proxy_url:
             raise ValueError("webhook_proxy_url is required for async Baseten execution.")
 
         if async_batch_size < 1:
             raise ValueError("async_batch_size must be greater than 0.")
+
+        # Check for a custom Baseten model ID provided by the user
+        # This allows for using a specific model deployment instead of the default
+        model_id = kwargs.pop("_model_id", None)
+        if model_id is None:
+            # If no custom ID, attempt to retrieve the default deployed Flow Judge model ID
+            # This covers the case where the model is already deployed but not specified
+            model_id = get_deployed_model_id()
+            if model_id is None:
+                # No deployed model found, so try to deploy the default Flow Judge model
+                # This step handles first-time usage or cases where the model was removed
+                if not ensure_model_deployment():
+                    # Deployment failed, which could be due to API key issues,
+                    # network problems, or Baseten service unavailability
+                    raise BasetenError(
+                        status_code=1,
+                        message=(
+                            "Baseten deployment is not available."
+                            " This could be due to API key issues, "
+                            "network problems, or Baseten service "
+                            "unavailability. Please check your "
+                            "API key, network connection, and Baseten service status."
+                        ),
+                    )
+                # Deployment succeeded, so attempt to retrieve the model ID again
+                # This should now succeed unless there's an unexpected issue
+                model_id = get_deployed_model_id()
+                if model_id is None:
+                    # If we still can't get the model ID, it indicates a deeper problem
+                    # This could be due to a bug in the deployment process or Baseten API changes
+                    raise BasetenError(
+                        status_code=2,
+                        message=(
+                            "Unable to retrieve Baseten's deployed model id. "
+                            "Please ensure the model is deployed or provide a custom '_model_id'."
+                        ),
+                    )
 
         if api_adapter is not None and not isinstance(
             api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)

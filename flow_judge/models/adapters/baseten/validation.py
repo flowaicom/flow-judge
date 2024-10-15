@@ -3,7 +3,6 @@ import hmac
 import logging
 import os
 from datetime import datetime, timezone
-from typing import List
 
 from pydantic import BaseModel, ConfigDict, JsonValue
 
@@ -23,7 +22,7 @@ class AsyncPredictResult(BaseModel):
     type: str
     time: datetime
     data: JsonValue
-    errors: List[dict]
+    errors: list[dict]
 
 
 def validate_baseten_signature(result, actual_signatures) -> bool:

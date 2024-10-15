@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Coroutine, Dict, List
+from collections.abc import Coroutine
+from typing import Any
 
 from .adapters.baseten.adapter import AsyncBasetenAPIAdapter, BaseAPIAdapter, BasetenAPIAdapter
 from .adapters.baseten.deploy import ensure_model_deployment, get_deployed_model_id
@@ -105,7 +106,7 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         logger.info("Successfully initialized Baseten!")
 
-    def _format_conversation(self, prompt: str) -> List[Dict[str, Any]]:
+    def _format_conversation(self, prompt: str) -> list[dict[str, Any]]:
         return [{"role": "user", "content": prompt.strip()}]
 
     def _generate(self, prompt: str) -> str:

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import aiohttp
 from openai import OpenAI, OpenAIError
@@ -35,7 +35,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
 
         super().__init__(base_url)
 
-    def _make_request(self, request_messages: Dict[str, Any]) -> Dict:
+    def _make_request(self, request_messages: dict[str, Any]) -> dict:
         try:
             completion = self.client.chat.completions.create(
                 messages=request_messages,
@@ -49,7 +49,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
         except Exception as e:
             logger.warning(f"An unexpected error occurred: {e}")
 
-    def _fetch_response(self, request_messages: Dict[str, Any]) -> str:
+    def _fetch_response(self, request_messages: dict[str, Any]) -> str:
         completion = self._make_request(request_messages)
 
         try:
@@ -60,7 +60,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             logger.warning("Returning default value")
             return ""
 
-    def _fetch_batched_response(self, request_messages: list[Dict[str, Any]]) -> list[str]:
+    def _fetch_batched_response(self, request_messages: list[dict[str, Any]]) -> list[str]:
         outputs = []
         for message in request_messages:
             completion = self._make_request(message)
@@ -94,7 +94,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
-    async def _make_request(self, request_messages: Dict[str, Any]) -> str:
+    async def _make_request(self, request_messages: dict[str, Any]) -> str:
         model_input = {"messages": request_messages}
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -171,15 +171,15 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     logger.error(f"Unknown exception occurred for request_id: {request_id}" f"{e}")
                     return message
 
-    async def _async_fetch_response(self, request_messages: Dict[str, Any]) -> str:
+    async def _async_fetch_response(self, request_messages: dict[str, Any]) -> str:
         request_id = await self._make_request(request_messages)
         return await asyncio.wait_for(
             self._fetch_stream(request_id), timeout=120
         )  # 2 minutes timeout
 
     async def _async_fetch_batched_response(
-        self, request_messages: List[Dict[str, Any]]
-    ) -> List[str]:
+        self, request_messages: list[dict[str, Any]]
+    ) -> list[str]:
         batches = [
             request_messages[i : i + self.batch_size]
             for i in range(0, len(request_messages), self.batch_size)

@@ -50,3 +50,4 @@ data/
 
 flake.nix
 flake.lock
+.direnv

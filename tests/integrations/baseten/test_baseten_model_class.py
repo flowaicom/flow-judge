@@ -218,6 +218,9 @@ async def test_baseten_init_valid(monkeypatch: MonkeyPatch) -> None:
         "flow_judge.models.adapters.baseten.adapter.ensure_baseten_webhook_secret", lambda: True
     )
 
+    # Mock the BASETEN_API_KEY environment variable
+    monkeypatch.setenv("BASETEN_API_KEY", "mocked_api_key")
+
     # Test synchronous initialization
     try:
         baseten_sync = Baseten(

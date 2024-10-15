@@ -63,14 +63,15 @@ class AsyncBaseFlowJudgeModel(ABC):
 
 class FlowJudgeRemoteModel(BaseFlowJudgeModel):
     """Flow judge model class for remote hosting."""
+
     def __init__(
-            self,
-            model_id: str,
-            model_type: str,
-            generation_params: dict[str, Any],
-            api_adapter: BaseAPIAdapter,
-            **remote_kwargs: Any
-        ):
+        self,
+        model_id: str,
+        model_type: str,
+        generation_params: dict[str, Any],
+        api_adapter: BaseAPIAdapter,
+        **remote_kwargs: Any,
+    ):
         """Initialize the FlowJudge remote model class.
 
         : param model_id: The ID of the model.
@@ -90,16 +91,9 @@ class FlowJudgeRemoteModel(BaseFlowJudgeModel):
         conversation = [{"role": "user", "content": prompt.strip()}]
         return self.api_adapter.fetch_response(conversation)
 
-    def batch_generate(
-            self,
-            prompts: list[str],
-            use_tqdm: bool = True,
-            **kwargs: Any
-        ) -> list[str]:
+    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
         """Batched generation request."""
-        conversations = [
-            [{"role": "user", "content": prompt.strip()}] for prompt in prompts
-        ]
+        conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
         return self.api_adapter.fetch_batched_response(conversations)
 
 

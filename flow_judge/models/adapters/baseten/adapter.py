@@ -13,8 +13,10 @@ from .validation import validate_baseten_signature
 
 logger = logging.getLogger(__name__)
 
+
 class BasetenAPIAdapter(BaseAPIAdapter):
     """API utility class to execute sync requests from Baseten remote model hosting."""
+
     def __init__(self, baseten_model_id: str):
         """Initialize the BasetenAPIAdapter.
 
@@ -26,15 +28,10 @@ class BasetenAPIAdapter(BaseAPIAdapter):
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError as e:
-            raise ValueError(
-                "BASETEN_API_KEY is not provided in the environment."
-            ) from e
+            raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
         base_url = "https://bridge.baseten.co/v1/direct"
-        self.client = OpenAI(
-            api_key=self.baseten_api_key,
-            base_url=base_url
-        )
+        self.client = OpenAI(api_key=self.baseten_api_key, base_url=base_url)
 
         super().__init__(base_url)
 
@@ -43,11 +40,7 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             completion = self.client.chat.completions.create(
                 messages=request_messages,
                 model="flowaicom/Flow-Judge-v0.1-AWQ",
-                extra_body={
-                    "baseten": {
-                        "model_id": self.baseten_model_id
-                    }
-                }
+                extra_body={"baseten": {"model_id": self.baseten_model_id}},
             )
             return completion
 
@@ -74,8 +67,10 @@ class BasetenAPIAdapter(BaseAPIAdapter):
             outputs.append(completion.choices[0].message.content.strip())
         return outputs
 
+
 class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
     """Async webhook requests for the Baseten remote model."""
+
     def __init__(self, baseten_model_id: str, webhook_proxy_url: str, batch_size: int):
         """Initialize the async Baseten adapter.
 
@@ -97,9 +92,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         try:
             self.baseten_api_key = os.environ["BASETEN_API_KEY"]
         except KeyError as e:
-            raise ValueError(
-                "BASETEN_API_KEY is not provided in the environment."
-            ) from e
+            raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
     async def _make_request(self, request_messages: Dict[str, Any]) -> str:
         model_input = {"messages": request_messages}
@@ -109,8 +102,8 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                 headers={"Authorization": f"Api-Key {self.baseten_api_key}"},
                 json={
                     "webhook_endpoint": self.webhook_proxy_url.rstrip("/") + "/webhook",
-                    "model_input": model_input
-                }
+                    "model_input": model_input,
+                },
             ) as response:
                 resp_json = await response.json()
 
@@ -128,9 +121,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         if request_id is None:
             return ""
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self.webhook_proxy_url}/listen/{request_id}"
-            ) as response:
+            async with session.get(f"{self.webhook_proxy_url}/listen/{request_id}") as response:
                 message = ""
                 signature = ""
 
@@ -147,9 +138,11 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         data_chunk = data_and_eot[0]
                         signature = data_and_eot[1].split("data: signature=")[1]
 
-                        resp_str = data_chunk.split(
-                            "data: "
-                        )[1] if data_chunk.startswith("data: ") else data_chunk
+                        resp_str = (
+                            data_chunk.split("data: ")[1]
+                            if data_chunk.startswith("data: ")
+                            else data_chunk
+                        )
 
                         try:
                             resp = json.loads(resp_str)
@@ -160,10 +153,11 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                             )
                             continue
 
-                        message = "" if message != "" and not validate_baseten_signature(
-                            resp,
-                            signature
-                        ) else message
+                        message = (
+                            ""
+                            if message != "" and not validate_baseten_signature(resp, signature)
+                            else message
+                        )
 
                         if len(data_and_eot) > 2 and "data: eot" in data_and_eot[2]:
                             break
@@ -171,15 +165,10 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     return message
 
                 except (TimeoutError, asyncio.CancelledError):
-                    logger.error(
-                        f"Request timed out for request_id: {request_id}"
-                    )
+                    logger.error(f"Request timed out for request_id: {request_id}")
                     return message
                 except Exception as e:
-                    logger.error(
-                        f"Unknown exception occurred for request_id: {request_id}"
-                        f"{e}"
-                    )
+                    logger.error(f"Unknown exception occurred for request_id: {request_id}" f"{e}")
                     return message
 
     async def _async_fetch_response(self, request_messages: Dict[str, Any]) -> str:
@@ -189,29 +178,23 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         )  # 2 minutes timeout
 
     async def _async_fetch_batched_response(
-            self,
-            request_messages: List[Dict[str, Any]]
-        ) -> List[str]:
+        self, request_messages: List[Dict[str, Any]]
+    ) -> List[str]:
         batches = [
-            request_messages[i:i+self.batch_size] for i in range(
-                0,
-                len(request_messages),
-                self.batch_size
-            )]
+            request_messages[i : i + self.batch_size]
+            for i in range(0, len(request_messages), self.batch_size)
+        ]
         results = []
         for batch in batches:
-            request_ids = await asyncio.gather(
-                *[self._make_request(message) for message in batch]
-            )
+            request_ids = await asyncio.gather(*[self._make_request(message) for message in batch])
 
             tasks = [self._fetch_stream(request_id) for request_id in request_ids]
 
             batch_results = await asyncio.gather(
-                *[asyncio.wait_for(task, timeout=120) for task in tasks],
-                return_exceptions=True
+                *[asyncio.wait_for(task, timeout=120) for task in tasks], return_exceptions=True
             )
 
-            results.extend([
-                result if not isinstance(result, Exception) else "" for result in batch_results
-            ])
+            results.extend(
+                [result if not isinstance(result, Exception) else "" for result in batch_results]
+            )
         return results

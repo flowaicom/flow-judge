@@ -39,9 +39,7 @@ class Model:
         self.llm_engine = None
         self.model_args = None
         self.hf_secret_token = kwargs["secrets"].get("hf_access_token", None)
-        self.openai_compatible = self._config["model_metadata"].get(
-            "openai_compatible", False
-        )
+        self.openai_compatible = self._config["model_metadata"].get("openai_compatible", False)
         self.vllm_base_url = None
         os.environ["HF_TOKEN"] = self.hf_secret_token
 
@@ -113,9 +111,7 @@ class Model:
     def _load_non_openai_compatible_model(self):
         """Load non-OpenAI compatible model."""
         try:
-            result = subprocess.run(
-                ["nvidia-smi"], capture_output=True, text=True, check=True
-            )
+            result = subprocess.run(["nvidia-smi"], capture_output=True, text=True, check=True)
             logger.info(result.stdout)
         except subprocess.CalledProcessError as e:
             logger.error(f"Command failed with code {e.returncode}: {e.stderr}")
@@ -125,9 +121,7 @@ class Model:
         self.tokenizer = AutoTokenizer.from_pretrained(self._model_repo_id)
 
         try:
-            result = subprocess.run(
-                ["nvidia-smi"], capture_output=True, text=True, check=True
-            )
+            result = subprocess.run(["nvidia-smi"], capture_output=True, text=True, check=True)
             logger.info(result.stdout)
         except subprocess.CalledProcessError as e:
             logger.error(f"Command failed with code {e.returncode}: {e.stderr}")
@@ -155,9 +149,7 @@ class Model:
                 self.vllm_base_url,
             )
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to start background health check: {e}"
-            ) from e
+            raise RuntimeError(f"Failed to start background health check: {e}") from e
 
     async def predict(self, model_input):
         """Generate output based on the input."""
@@ -186,6 +178,7 @@ class Model:
             model_input["model"] = self._model_repo_id
 
         if stream:
+
             async def generator():
                 async with self._client.stream(
                     "POST",

@@ -50,9 +50,11 @@ except ImportError:
 
 try:
     from flow_judge.models.baseten import Baseten
+
     __all__.append("Baseten")
 except ImportError:
     Baseten = None
+
 
 def get_available_models():
     """Return a list of available model classes based on installed extras."""

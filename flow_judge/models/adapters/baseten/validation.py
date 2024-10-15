@@ -11,22 +11,22 @@ logger = logging.getLogger(__name__)
 
 TIMESTAMP_TOLERANCE_SECONDS = 300
 
+
 class AsyncPredictResult(BaseModel):
-  """Baseten completion response format."""
-  model_config = ConfigDict(protected_namespaces=(), extra='allow')
+    """Baseten completion response format."""
 
-  request_id: str
-  model_id: str
-  deployment_id: str
-  type: str
-  time: datetime
-  data: JsonValue
-  errors: List[dict]
+    model_config = ConfigDict(protected_namespaces=(), extra="allow")
 
-def validate_baseten_signature(
-        result,
-        actual_signatures
-    ) -> bool:
+    request_id: str
+    model_id: str
+    deployment_id: str
+    type: str
+    time: datetime
+    data: JsonValue
+    errors: List[dict]
+
+
+def validate_baseten_signature(result, actual_signatures) -> bool:
     """Webhook signature validation from baseten."""
     try:
         webhook_secret = os.environ["BASETEN_WEBHOOK_SECRET"]
@@ -36,12 +36,13 @@ def validate_baseten_signature(
             "Unable to validate baseten signature for batched requests."
             "Set the BASETEN_WEBHOOK_SECRET env variable to proceed."
             f"{e}"
-            )
+        )
         return False
 
     async_predict_result = AsyncPredictResult(**result)
 
-    if (datetime.now(timezone.utc) - async_predict_result.time
+    if (
+        datetime.now(timezone.utc) - async_predict_result.time
     ).total_seconds() > TIMESTAMP_TOLERANCE_SECONDS:
         logger.error(
             f"Async predict result was received after {TIMESTAMP_TOLERANCE_SECONDS} seconds"
@@ -49,7 +50,7 @@ def validate_baseten_signature(
         )
         return False
 
-    for actual_signature in actual_signatures.replace("v1=","").split(","):
+    for actual_signature in actual_signatures.replace("v1=", "").split(","):
         expected_signature = hmac.digest(
             webhook_secret.encode("utf-8"),
             async_predict_result.model_dump_json().encode("utf-8"),

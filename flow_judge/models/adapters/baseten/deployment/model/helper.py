@@ -9,11 +9,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_HEALTH_CHECK_INTERVAL = 5  # seconds
 
+
 def log_subprocess_output(process):
     """Process logs for the vLLM subprocess."""
     while True:
         output = process.stdout.readline()
-        if output == '' and process.poll() is not None:
+        if output == "" and process.poll() is not None:
             break
         if output:
             logger.info(f"vLLM subprocess stdout: {output.strip()}")
@@ -64,9 +65,7 @@ def run_background_vllm_health_check(
     logger.info("Starting background health check loop")
     loop = asyncio.new_event_loop()
     if use_openai_compatible_server:
-        loop.create_task(
-            monitor_vllm_server_health(vllm_server_url, health_check_interval)
-        )
+        loop.create_task(monitor_vllm_server_health(vllm_server_url, health_check_interval))
     else:
         loop.create_task(monitor_vllm_engine_health(vllm_engine, health_check_interval))
     thread = threading.Thread(target=loop.run_forever, daemon=True)

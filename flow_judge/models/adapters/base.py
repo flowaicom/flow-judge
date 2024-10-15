@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 class BaseAPIAdapter(ABC):
     """Base adapter layer for making remote requests to hosted models."""
+
     def __init__(self, base_url: str):
         """Initialize the BaseAPIAdapter.
 
@@ -21,8 +22,10 @@ class BaseAPIAdapter(ABC):
         """Generate responses for multiple requests."""
         pass
 
+
 class AsyncBaseAPIAdapter(ABC):
     """Base adapter layer for making remote requests to hosted models."""
+
     def __init__(self, base_url: str):
         """Initialize the AsyncBaseAPIAdapter.
 
@@ -37,8 +40,7 @@ class AsyncBaseAPIAdapter(ABC):
 
     @abstractmethod
     async def _async_fetch_batched_response(
-        self,
-        request_bodies: list[Dict[str, Any]]
+        self, request_bodies: list[Dict[str, Any]]
     ) -> list[str]:
         """Generate responses for multiple requests."""
         pass

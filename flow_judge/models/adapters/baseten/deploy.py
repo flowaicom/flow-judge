@@ -28,15 +28,16 @@ def _initialize_model() -> bool:
         deployment.wait_for_active()
         logger.info("Flow Judge Baseten deployment successful")
         return True
-    except ApiError:
-        pass
-    except ValueError:
-        pass
-
-    logger.error(
-        "Flow Judge Baseten deployment failed."
-        "Ensure that provided API key is correct and try again."
-    )
+    except ApiError as e:
+        logger.error(
+            "Flow Judge Baseten deployment failed."
+            "Ensure that provided API key is correct and try again. " + e.message
+        )
+    except ValueError as e:
+        logger.error(
+            "Flow Judge Baseten deployment failed."
+            "Ensure that provided API key is correct and try again. " + str(e)
+        )
 
 
 def _get_baseten_api_key() -> str | None:

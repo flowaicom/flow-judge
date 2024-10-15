@@ -123,9 +123,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     logger.error(f"Unable to parse Baseten response: {e}")
                     return None
                 except Exception as e:
-                    logger.error(f"Unknown error occured with Beseten request."
-                        f"{e}"
-                    )
+                    logger.error(f"Unknown error occured with Beseten request." f"{e}")
                     return None
 
     async def _fetch_stream(self, request_id: str) -> str:

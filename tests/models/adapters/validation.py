@@ -52,10 +52,12 @@ class TestValidateBasetenSignature:
                 hashlib.sha256,
             ).hex()
 
-            assert validate_baseten_signature(
-                mock_async_predict_result_instance,
-                f"v1={valid_signature}"
-            ) is True
+            assert (
+                validate_baseten_signature(
+                    mock_async_predict_result_instance, f"v1={valid_signature}"
+                )
+                is True
+            )
 
     def test_invalid_signature(self):
         """Test for an invalid Baseten signature."""
@@ -69,15 +71,18 @@ class TestValidateBasetenSignature:
             # Mock invalid signature
             invalid_signature = "invalid_signature"
 
-            assert validate_baseten_signature(
-                mock_async_predict_result_instance,
-                f"v1={invalid_signature}"
-            ) is False
+            assert (
+                validate_baseten_signature(
+                    mock_async_predict_result_instance, f"v1={invalid_signature}"
+                )
+                is False
+            )
 
     def test_stale_timestamp(self):
         """Test for a stale timestamp."""
-        stale_timestamp = datetime.now(timezone.utc)\
-              - timedelta(seconds=TIMESTAMP_TOLERANCE_SECONDS + 1)
+        stale_timestamp = datetime.now(timezone.utc) - timedelta(
+            seconds=TIMESTAMP_TOLERANCE_SECONDS + 1
+        )
 
         with patch(
             "flow_judge.models.adapters.baseten.validation.AsyncPredictResult"
@@ -94,10 +99,12 @@ class TestValidateBasetenSignature:
                 hashlib.sha256,
             ).hex()
 
-            assert validate_baseten_signature(
-                mock_async_predict_result_instance,
-                f"v1={valid_signature}"
-            ) is False
+            assert (
+                validate_baseten_signature(
+                    mock_async_predict_result_instance, f"v1={valid_signature}"
+                )
+                is False
+            )
 
     def test_missing_webhook_secret(self, monkeypatch):
         """Test for a missing BASETEN_WEBHOOK_SECRET environment variable."""
@@ -117,7 +124,9 @@ class TestValidateBasetenSignature:
                 hashlib.sha256,
             ).hex()
 
-            assert validate_baseten_signature(
-                mock_async_predict_result_instance,
-                f"v1={valid_signature}"
-            ) is False
+            assert (
+                validate_baseten_signature(
+                    mock_async_predict_result_instance, f"v1={valid_signature}"
+                )
+                is False
+            )

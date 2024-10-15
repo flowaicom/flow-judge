@@ -136,7 +136,10 @@ def test_async_baseten_api_adapter_init(mock_ensure_webhook_secret, async_basete
     assert async_baseten_api_adapter.webhook_proxy_url == "https://test.webhook.com"
     assert async_baseten_api_adapter.batch_size == 2
     assert async_baseten_api_adapter.baseten_api_key == "test_api_key"
-    assert async_baseten_api_adapter.base_url == "https://model-test_model_id.api.baseten.co/production"
+    assert (
+        async_baseten_api_adapter.base_url
+        == "https://model-test_model_id.api.baseten.co/production"
+    )
 
 
 def test_async_baseten_api_adapter_init_missing_api_key():
@@ -170,15 +173,17 @@ def test_async_make_request(mock_post, async_baseten_api_adapter):
     # Test successful request
     mock_response = Mock()
     mock_response.json.return_value = {"request_id": "test_request_id"}
-    mock_post.return_value.__aenter__.return_value.json.return_value = \
+    mock_post.return_value.__aenter__.return_value.json.return_value = (
         mock_response.json.return_value
+    )
     result = asyncio.run(async_baseten_api_adapter._make_request(request_messages))
     assert result == "test_request_id"
 
     # Test request failure
     mock_response.json.return_value = {"error": "test error"}
-    mock_post.return_value.__aenter__.return_value.json.return_value = \
+    mock_post.return_value.__aenter__.return_value.json.return_value = (
         mock_response.json.return_value
+    )
     result = asyncio.run(async_baseten_api_adapter._make_request(request_messages))
     assert result is None
 
@@ -208,9 +213,7 @@ def test_async_fetch_response(mock_fetch_stream, mock_make_request, async_basete
 @patch("flow_judge.models.adapters.baseten.adapter.AsyncBasetenAPIAdapter._make_request")
 @patch("flow_judge.models.adapters.baseten.adapter.AsyncBasetenAPIAdapter._fetch_stream")
 def test_async_fetch_batched_response(
-    mock_fetch_stream,
-    mock_make_request,
-    async_baseten_api_adapter
+    mock_fetch_stream, mock_make_request, async_baseten_api_adapter
 ):
     """Test case to ensure the _async_fetch_batched_response method of AsyncBasetenAPIAdapter works.
 
@@ -234,4 +237,3 @@ def test_async_fetch_batched_response(
     mock_make_request.side_effect = ["request_id1", "request_id2", "request_id3"]
     result = asyncio.run(async_baseten_api_adapter._async_fetch_batched_response(request_messages))
     assert result == ["Hello, world!", "", "Hello, galaxy!"]
-

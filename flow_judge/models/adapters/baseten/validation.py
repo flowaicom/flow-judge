@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 TIMESTAMP_TOLERANCE_SECONDS = 300
 
 class AsyncPredictResult(BaseModel):
+  """Baseten completion response format."""
   model_config = ConfigDict(protected_namespaces=(), extra='allow')
 
   request_id: str
@@ -26,6 +27,7 @@ def validate_baseten_signature(
         result,
         actual_signatures
     ) -> bool:
+    """Webhook signature validation from baseten."""
     try:
         webhook_secret = os.environ["BASETEN_WEBHOOK_SECRET"]
     except Exception as e:
@@ -42,7 +44,8 @@ def validate_baseten_signature(
     if (datetime.now(timezone.utc) - async_predict_result.time
     ).total_seconds() > TIMESTAMP_TOLERANCE_SECONDS:
         logger.error(
-            f"Async predict result was received after {TIMESTAMP_TOLERANCE_SECONDS} seconds and is considered stale, Baseten signature was not validated."
+            f"Async predict result was received after {TIMESTAMP_TOLERANCE_SECONDS} seconds"
+            "and is considered stale, Baseten signature was not validated."
         )
         return False
 

@@ -62,10 +62,7 @@ class AsyncBaseFlowJudgeModel(ABC):
 
 
 class FlowJudgeRemoteModel(BaseFlowJudgeModel):
-    """Flow judge model class for remote hosting.
-    Expects the api_adapter to return a str message for generate.
-    Expects the api_adapter to return a list of str messages for batch generate
-    """
+    """Flow judge model class for remote hosting."""
     def __init__(
             self,
             model_id: str,
@@ -74,6 +71,13 @@ class FlowJudgeRemoteModel(BaseFlowJudgeModel):
             api_adapter: BaseAPIAdapter,
             **remote_kwargs: Any
         ):
+        """Initialize the FlowJudge remote model class.
+
+        : param model_id: The ID of the model.
+        : param model_type: Type of the model based on ModelType.
+        : param generation_params: Relevant generation params for the model type.
+        : paramm remote_kwargs: Keyword arguments to initialize the parameters.
+        """
         super().__init__(model_id, model_type, generation_params, **remote_kwargs)
 
         if not isinstance(api_adapter, BaseAPIAdapter):
@@ -82,6 +86,7 @@ class FlowJudgeRemoteModel(BaseFlowJudgeModel):
         self.api_adapter = api_adapter
 
     def generate(self, prompt: str) -> str:
+        """Single generation request."""
         conversation = [{"role": "user", "content": prompt.strip()}]
         return self.api_adapter.fetch_response(conversation)
 
@@ -91,7 +96,10 @@ class FlowJudgeRemoteModel(BaseFlowJudgeModel):
             use_tqdm: bool = True,
             **kwargs: Any
         ) -> list[str]:
-        conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
+        """Batched generation request."""
+        conversations = [
+            [{"role": "user", "content": prompt.strip()}] for prompt in prompts
+        ]
         return self.api_adapter.fetch_batched_response(conversations)
 
 

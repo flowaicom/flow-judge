@@ -14,6 +14,7 @@ from .common import (
 logger = logging.getLogger(__name__)
 
 class BasetenModelConfig(ModelConfig):
+    """Model config for the Baseten model class."""
     def __init__(
             self,
             model_id: str,
@@ -23,19 +24,22 @@ class BasetenModelConfig(ModelConfig):
             async_batch_size: int = 128,
             **kwargs: Any
         ):
+        """Initialize the Baseten model config.
+
+        : param: model_id: baseten model id.
+        : param: generation_params: VllmGenerationParams.
+        : param exec_async: Baseten async execution.
+        : param webhook_proxy_url: Webhook URL for Baseten async execution.
+        : param async_batch_size: batch size for concurrent requests to Baseten in async.
+        """
         super().__init__(model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)
         self.webhook_proxy_url = webhook_proxy_url
         self.exec_async = exec_async
+        self.async_batch_size = async_batch_size
 
 
 class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
-    """Combined FlowJudge Model class for Baseten sync and webhook async operations.
-    
-    Arguments:
-        api_adapter ((BasetenAPIAdapter, AsyncBasetenAPIAdapter), Optional): api handling class for Baseten requests.
-        webhook_proxy_url (str, Optional): The webhook url for the proxy when exec_async is set to True.
-        exec_async (bool, Optional): Async webhook execution.
-    """
+    """Combined FlowJudge Model class for Baseten sync and webhook async operations."""
     def __init__(
             self,
             api_adapter: BaseAPIAdapter = None,
@@ -44,6 +48,12 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             async_batch_size: int = 128,
             **kwargs: Any
         ):
+        """Initialize the Baseten Model class.
+
+        : param api_adapter: api handling class for Baseten requests.
+        : param webhook_proxy_url: The webhook url for the proxy when exec_async is set to True.
+        : param exec_async: Async webhook execution.
+        """
         if not ensure_model_deployment():
             raise BasetenError(
                 status_code=1,
@@ -59,15 +69,21 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             )
 
         if exec_async and not webhook_proxy_url:
-            raise ValueError("Webhook proxy url is required for async Baseten execution.")
+            raise ValueError(
+                "Webhook proxy url is required for async Baseten execution."
+            )
 
         if async_batch_size < 1:
             raise ValueError("async_batch_size needs to be greater than 0.")
 
-        if api_adapter is not None and not isinstance(api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)):
+        if api_adapter is not None and not isinstance(
+            api_adapter,
+            (BasetenAPIAdapter, AsyncBasetenAPIAdapter)
+        ):
             raise BasetenError(
                 status_code=3,
-                message="The provided API adapter is incompatible, accepted types are BasetenAPIAdapter or AsyncBasetenAPIAdapter"
+                message="The provided API adapter is incompatible,"
+                " accepted types are BasetenAPIAdapter or AsyncBasetenAPIAdapter"
             )
 
         if api_adapter is None:
@@ -84,10 +100,20 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         # default params
         generation_params = VllmGenerationParams()
-        config = BasetenModelConfig(baseten_model_id, generation_params, exec_async, webhook_proxy_url, async_batch_size)
+        config = BasetenModelConfig(
+            baseten_model_id,
+            generation_params,
+            exec_async,
+            webhook_proxy_url,
+            async_batch_size
+        )
         self.config = config
 
-        super().__init__(baseten_model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)
+        super().__init__(
+            baseten_model_id,
+            ModelType.BASETEN_VLLM,
+            generation_params, **kwargs
+        )
 
         logger.info("Successfully initialized Baseten!")
 
@@ -116,7 +142,9 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             conversation = self._format_conversation(prompt)
             return await self.api_adapter._async_fetch_response(conversation)
         else:
-            logger.error("Attempting to run an async request with a synchronous API adapter")
+            logger.error(
+                "Attempting to run an async request with a synchronous API adapter"
+            )
 
     async def _async_batch_generate(
             self,
@@ -127,7 +155,9 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             conversations = [self._format_conversation(prompt) for prompt in prompts]
             return await self.api_adapter._async_fetch_batched_response(conversations)
         else:
-            logger.error("Attempting to run an async request with a synchronous API adapter")
+            logger.error(
+                "Attempting to run an async request with a synchronous API adapter"
+            )
 
 
 class BasetenError(Exception):

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_HEALTH_CHECK_INTERVAL = 5  # seconds
 
 def log_subprocess_output(process):
+    """Process logs for the vLLM subprocess."""
     while True:
         output = process.stdout.readline()
         if output == '' and process.poll() is not None:
@@ -23,6 +24,7 @@ def log_subprocess_output(process):
 
 
 async def monitor_vllm_server_health(vllm_server_url, health_check_interval):
+    """Health check for the vLLM server."""
     assert vllm_server_url is not None, "vllm_server_url must not be None"
     try:
         async with httpx.AsyncClient() as client:
@@ -39,6 +41,7 @@ async def monitor_vllm_server_health(vllm_server_url, health_check_interval):
 
 
 async def monitor_vllm_engine_health(vllm_engine, health_check_interval):
+    """Health check for the vLLM engine."""
     assert vllm_engine is not None, "vllm_engine must not be None"
     try:
         while True:
@@ -57,6 +60,7 @@ def run_background_vllm_health_check(
     vllm_engine=None,
     vllm_server_url=None,
 ):
+    """Background process for vLLM health checks."""
     logger.info("Starting background health check loop")
     loop = asyncio.new_event_loop()
     if use_openai_compatible_server:

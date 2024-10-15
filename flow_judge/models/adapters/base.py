@@ -5,6 +5,10 @@ from typing import Any, Dict
 class BaseAPIAdapter(ABC):
     """Base adapter layer for making remote requests to hosted models."""
     def __init__(self, base_url: str):
+        """Initialize the BaseAPIAdapter.
+
+        : param: base_url: The baseten deployed model url
+        """
         self.base_url = base_url
 
     @abstractmethod
@@ -20,6 +24,10 @@ class BaseAPIAdapter(ABC):
 class AsyncBaseAPIAdapter(ABC):
     """Base adapter layer for making remote requests to hosted models."""
     def __init__(self, base_url: str):
+        """Initialize the AsyncBaseAPIAdapter.
+
+        : param: base_url: The baseten deployed model url
+        """
         self.base_url = base_url
 
     @abstractmethod
@@ -28,6 +36,9 @@ class AsyncBaseAPIAdapter(ABC):
         pass
 
     @abstractmethod
-    async def _async_fetch_batched_response(self, request_bodies: list[Dict[str, Any]]) -> list[str]:
+    async def _async_fetch_batched_response(
+        self,
+        request_bodies: list[Dict[str, Any]]
+    ) -> list[str]:
         """Generate responses for multiple requests."""
         pass

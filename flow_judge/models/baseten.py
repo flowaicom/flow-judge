@@ -23,7 +23,7 @@ class BasetenModelConfig(ModelConfig):
         model_id: str,
         generation_params: VllmGenerationParams,
         exec_async: bool = False,
-        webhook_proxy_url: str = None,
+        webhook_proxy_url: str | None = None,
         async_batch_size: int = 128,
         **kwargs: Any,
     ):
@@ -35,6 +35,15 @@ class BasetenModelConfig(ModelConfig):
         : param webhook_proxy_url: Webhook URL for Baseten async execution.
         : param async_batch_size: batch size for concurrent requests to Baseten in async.
         """
+        if not model_id:
+            raise ValueError("model_id should not be empty")
+        if not isinstance(generation_params, VllmGenerationParams):
+            raise ValueError("generation_params should be an instance of VllmGenerationParams")
+        if async_batch_size <= 0:
+            raise ValueError(f"async_batch_size should be greater than 0, got {async_batch_size}")
+        if exec_async and webhook_proxy_url is None:
+            raise ValueError("Webhook proxy url should be set for async execution")
+
         super().__init__(model_id, ModelType.BASETEN_VLLM, generation_params, **kwargs)
         self.webhook_proxy_url = webhook_proxy_url
         self.exec_async = exec_async

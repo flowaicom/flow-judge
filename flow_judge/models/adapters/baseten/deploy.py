@@ -2,7 +2,6 @@ import getpass
 import http
 import logging
 import os
-from typing import Dict, List, Optional
 
 import requests
 import truss
@@ -14,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def _is_interactive() -> bool:
     import sys
+
     return sys.__stdin__.isatty()
 
 
@@ -24,7 +24,7 @@ def _initialize_model() -> bool:
 
     truss_path = os.path.dirname(os.path.realpath(os.path.abspath(__file__))) + "/deployment"
     try:
-        deployment = truss.push(truss_path, promote=True, publish=False, trusted=True, environment=None)
+        deployment = truss.push(truss_path, promote=True, trusted=True, environment=None)
         deployment.wait_for_active()
         logger.info("Flow Judge Baseten deployment successful")
         return True
@@ -33,10 +33,13 @@ def _initialize_model() -> bool:
     except ValueError:
         pass
 
-    logger.error("Flow Judge Baseten deployment failed. Ensure that provided API key is correct and try again.")
+    logger.error(
+        "Flow Judge Baseten deployment failed."
+        "Ensure that provided API key is correct and try again."
+    )
 
 
-def _get_baseten_api_key() -> Optional[str]:
+def _get_baseten_api_key() -> str | None:
     api_key = os.environ.get("BASETEN_API_KEY")
     if api_key is None or api_key == "":
         # Try trussrc file
@@ -61,7 +64,7 @@ def _validate_auth_status():
         "GET",
         "https://api.baseten.co/v1/models",
         headers={"Authorization": f"Api-Key {api_key}"},
-        json={}
+        json={},
     )
 
     if response.status_code != http.HTTPStatus.OK:
@@ -70,21 +73,21 @@ def _validate_auth_status():
     return True
 
 
-def _get_models() -> Optional[List[Dict]]:
+def _get_models() -> list[dict] | None:
     api_key = _get_baseten_api_key()
 
     response = requests.request(
         "GET",
         "https://api.baseten.co/v1/models",
         headers={"Authorization": f"Api-Key {api_key}"},
-        json={}
+        json={},
     )
 
     if response.status_code != http.HTTPStatus.OK:
         return None
 
     resp = response.json()
-    if resp is None or type(resp) is not dict or "models" not in resp:
+    if resp is None or not isinstance(resp, dict) or "models" not in resp:
         return None
 
     return resp["models"]
@@ -112,7 +115,8 @@ def _authenticate_truss_with_env_api_key():
         truss.login(env_api_key)
 
 
-def get_deployed_model_id() -> Optional[str]:
+def get_deployed_model_id() -> str | None:
+    """Returns model ID of the deployed Flow Judge model."""
     models = _get_models()
     if models is None:
         return None
@@ -125,7 +129,7 @@ def get_deployed_model_id() -> Optional[str]:
 
 
 def ensure_model_deployment():
-    # In case user already provided API key in env variable
+    """Ensures Flow Judge model deployment to Baseten."""
     _authenticate_truss_with_env_api_key()
 
     if _validate_auth_status():
@@ -141,7 +145,7 @@ def ensure_model_deployment():
     if not _is_interactive():
         print("Set the Baseten API key in `BASETEN_API_KEY` environment variable and run again:")
         print("```")
-        print("os.environ[\"BASETEN_API_KEY\"] = \"«your API key»\"")
+        print('os.environ["BASETEN_API_KEY"] = "«your API key»"')
         print("```")
         return False
 
@@ -149,7 +153,10 @@ def ensure_model_deployment():
     while True:
         key = getpass.getpass("Baseten API key (hidden): ")
         if key is None or len(key) < 5:
-            print("Baseten API key seems to be incorrect. The key must be at least 5 characters long")
+            print(
+                "Baseten API key seems to be incorrect."
+                "The key must be at least 5 characters long"
+            )
             continue
 
         truss.login(key)

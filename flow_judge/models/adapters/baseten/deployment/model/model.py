@@ -11,7 +11,7 @@ from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 
-from model.helper import log_subprocess_output, run_background_vllm_health_check
+from .helper import log_subprocess_output, run_background_vllm_health_check
 
 MAX_LENGTH = 1024
 TEMPERATURE = 0.1

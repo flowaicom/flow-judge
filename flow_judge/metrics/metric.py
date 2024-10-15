@@ -43,10 +43,3 @@ class CustomMetric(Metric):
             required_inputs=required_inputs,
             required_output=required_output,
         )
-
-
-def list_all_metrics():
-    """List all metric variable names."""
-    return [
-        name for name, value in globals().items() if isinstance(value, Metric) and name.isupper()
-    ]

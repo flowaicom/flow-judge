@@ -114,19 +114,19 @@ def test_baseten_model_config_init_valid(
 @pytest.mark.parametrize(
     "invalid_input, expected_error",
     [
-        ({"async_batch_size": 0}, "async_batch_size should be greater than 0, got 0"),
-        ({"async_batch_size": -1}, "async_batch_size should be greater than 0, got -1"),
+        ({"async_batch_size": 0}, "async_batch_size must be > 0, got 0"),
+        ({"async_batch_size": -1}, "async_batch_size must be > 0, got -1"),
         (
             {"exec_async": True, "webhook_proxy_url": None},
-            "Webhook proxy url should be set for async execution",
-        ),
-        (
-            {"generation_params": None},
-            "generation_params should be an instance of VllmGenerationParams",
+            "webhook_proxy_url is required for async execution",
         ),
         (
             {"generation_params": {}},
-            "generation_params should be an instance of VllmGenerationParams",
+            "generation_params must be an instance of VllmGenerationParams",
+        ),
+        (
+            {"generation_params": None},
+            "generation_params must be an instance of VllmGenerationParams",
         ),
     ],
 )
@@ -155,8 +155,6 @@ def test_baseten_model_config_init_invalid(
 
     .. warning::
         - This test may not catch all possible error conditions.
-        - It assumes that the error messages in the BasetenModelConfig class
-          remain constant.
     """
     valid_params = {
         "generation_params": valid_generation_params,
@@ -170,9 +168,19 @@ def test_baseten_model_config_init_invalid(
     with pytest.raises(ValueError) as excinfo:
         BasetenModelConfig(**test_params)
 
-    assert (
-        str(excinfo.value) == expected_error
-    ), f"Unexpected exception message: {str(excinfo.value)}"
+    assert str(excinfo.value) == expected_error, (
+        f"Unexpected exception message: {str(excinfo.value)}\n" f"Expected: {expected_error}"
+    )
+
+    # Additional check to ensure no unexpected keys in test_params
+    unexpected_keys = set(test_params.keys()) - set(valid_params.keys())
+    assert not unexpected_keys, f"Unexpected keys in test parameters: {unexpected_keys}"
+
+    # Verify that valid_params alone don't raise an exception
+    try:
+        BasetenModelConfig(**valid_params)
+    except Exception as e:
+        pytest.fail(f"Valid parameters raised an unexpected exception: {str(e)}")
 
 
 @pytest.mark.asyncio
@@ -199,7 +207,10 @@ async def test_baseten_init_valid(monkeypatch, caplog):
         - The test does not verify the correct implementation of the API adapters.
     """
     caplog.set_level(logging.DEBUG)
-    with patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True):
+    with (
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+        patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"),
+    ):
         # Test synchronous initialization
         try:
             baseten_sync = Baseten(
@@ -283,11 +294,11 @@ async def test_baseten_init_valid(monkeypatch, caplog):
 
     # Test error cases
     with pytest.raises(
-        ValueError, match="Webhook proxy url is required for " "async Baseten execution"
+        ValueError, match="webhook_proxy_url is required for async Baseten execution"
     ):
         Baseten(exec_async=True, async_batch_size=128)
 
-    with pytest.raises(ValueError, match="async_batch_size needs to be greater than 0"):
+    with pytest.raises(ValueError, match="async_batch_size must be greater than 0"):
         Baseten(exec_async=False, async_batch_size=0)
 
     with patch("flow_judge.models.baseten.ensure_model_deployment", return_value=False):
@@ -295,21 +306,16 @@ async def test_baseten_init_valid(monkeypatch, caplog):
             Baseten(exec_async=False, async_batch_size=128)
 
     with patch("flow_judge.models.baseten.get_deployed_model_id", return_value=None):
-        with pytest.raises(
-            BasetenError,
-            match="Unable to retrieve Baseten's "
-            "deployed model id. Please ensure the model is "
-            "deployed or provide a custom '_model_id'.",
-        ):
+        with pytest.raises(BasetenError, match="Unable to retrieve Baseten's deployed model id"):
             Baseten(exec_async=False, async_batch_size=128)
 
     # Test with custom _model_id
     with patch("flow_judge.models.baseten.get_deployed_model_id", return_value=None):
         try:
             baseten_custom = Baseten(exec_async=False, async_batch_size=128, _model_id="custom_id")
-        except Exception:
+        except Exception as e:
             pytest.fail(
-                "Baseten initialization with custom _model_id" " failed unexpectedly: {str(e)}"
+                f"Baseten initialization with custom _model_id failed unexpectedly: {str(e)}"
             )
 
         assert baseten_custom.config.model_id == "custom_id", "Custom _model_id not set correctly"

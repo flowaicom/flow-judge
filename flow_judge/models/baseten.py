@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 class BasetenModelConfig(ModelConfig):
     """Model config for the Baseten model class."""
 
-    _DEFAULT_MODEL_ID = get_deployed_model_id()
-
     def __init__(
         self,
         generation_params: VllmGenerationParams,
@@ -31,23 +29,26 @@ class BasetenModelConfig(ModelConfig):
     ):
         """Initialize the Baseten model config.
 
-        : param: generation_params: VllmGenerationParams.
-        : param exec_async: Baseten async execution.
-        : param webhook_proxy_url: Webhook URL for Baseten async execution.
-        : param async_batch_size: batch size for concurrent requests to Baseten in async.
+        :param generation_params: VllmGenerationParams for text generation.
+        :param exec_async: Whether to use async execution.
+        :param webhook_proxy_url: Webhook URL for Baseten async execution.
+        :param async_batch_size: Batch size for concurrent requests in async mode.
+        :raises ValueError: If any input parameters are invalid.
         """
-        model_id = kwargs.pop("_model_id", self._DEFAULT_MODEL_ID)
+        model_id = kwargs.pop("_model_id", None)
         if model_id is None:
-            raise ValueError("Unable to retrieve Baseten's deployed model id.")
+            model_id = get_deployed_model_id()
+            if model_id is None:
+                raise ValueError("Unable to retrieve Baseten's deployed model id.")
 
         model_type = ModelType.BASETEN_VLLM_ASYNC if exec_async else ModelType.BASETEN_VLLM
 
         if not isinstance(generation_params, VllmGenerationParams):
-            raise ValueError("generation_params should be an instance of VllmGenerationParams")
+            raise ValueError("generation_params must be an instance of VllmGenerationParams")
         if async_batch_size <= 0:
-            raise ValueError(f"async_batch_size should be greater than 0, got {async_batch_size}")
+            raise ValueError(f"async_batch_size must be > 0, got {async_batch_size}")
         if exec_async and webhook_proxy_url is None:
-            raise ValueError("Webhook proxy url should be set for async execution")
+            raise ValueError("webhook_proxy_url is required for async execution")
 
         super().__init__(model_id, model_type, generation_params, **kwargs)
         self.webhook_proxy_url = webhook_proxy_url
@@ -57,8 +58,6 @@ class BasetenModelConfig(ModelConfig):
 
 class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     """Combined FlowJudge Model class for Baseten sync and webhook async operations."""
-
-    _DEFAULT_MODEL_ID = get_deployed_model_id()
 
     def __init__(
         self,
@@ -71,26 +70,29 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     ):
         """Initialize the Baseten Model class.
 
-        :param api_adapter: api handling class for Baseten requests.
-        :param webhook_proxy_url: The webhook url for the proxy when exec_async is set to True.
-        :param exec_async: Async webhook execution.
+        :param api_adapter: API handling class for Baseten requests.
+        :param webhook_proxy_url: The webhook url for the proxy when exec_async is True.
+        :param exec_async: Whether to use async webhook execution.
         :param async_batch_size: Batch size for concurrent requests to Baseten in async.
         :param generation_params: Dictionary of parameters for text generation.
+        :raises BasetenError: If Baseten deployment or model ID retrieval fails.
+        :raises ValueError: If input parameters are invalid.
         """
         if not ensure_model_deployment():
             raise BasetenError(status_code=1, message="Baseten deployment is not available.")
 
-        model_id = kwargs.pop("_model_id", get_deployed_model_id())
+        model_id = kwargs.pop("_model_id", None)
         if model_id is None:
-            raise BasetenError(
-                status_code=2,
-                message=(
-                    "Unable to retrieve Baseten's deployed model id. "
-                    "Please ensure the model is deployed or provide a custom '_model_id'."
-                ),
-            )
-
-        if model_id != self._DEFAULT_MODEL_ID:
+            model_id = get_deployed_model_id()
+            if model_id is None:
+                raise BasetenError(
+                    status_code=2,
+                    message=(
+                        "Unable to retrieve Baseten's deployed model id. "
+                        "Please ensure the model is deployed or provide a custom '_model_id'."
+                    ),
+                )
+        else:
             warnings.warn(
                 f"You have entered a custom Baseten model id: '{model_id}'. "
                 "Using other models may lead to unexpected behavior, and we do "
@@ -100,31 +102,24 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
             )
 
         if exec_async and not webhook_proxy_url:
-            raise ValueError("Webhook proxy url is required for async Baseten execution.")
+            raise ValueError("webhook_proxy_url is required for async Baseten execution.")
 
         if async_batch_size < 1:
-            raise ValueError("async_batch_size needs to be greater than 0.")
+            raise ValueError("async_batch_size must be greater than 0.")
 
         if api_adapter is not None and not isinstance(
             api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)
         ):
             raise BasetenError(
                 status_code=3,
-                message="The provided API adapter is incompatible, "
-                "accepted types are BasetenAPIAdapter or AsyncBasetenAPIAdapter",
+                message="Incompatible API adapter. Use BasetenAPIAdapter or AsyncBasetenAPIAdapter",
             )
 
-        if api_adapter is None:
-            if not exec_async:
-                self.api_adapter = BasetenAPIAdapter(model_id)
-            else:
-                self.api_adapter = AsyncBasetenAPIAdapter(
-                    baseten_model_id=model_id,
-                    webhook_proxy_url=webhook_proxy_url,
-                    batch_size=async_batch_size,
-                )
-        else:
-            self.api_adapter = api_adapter
+        self.api_adapter = api_adapter or (
+            AsyncBasetenAPIAdapter(model_id, webhook_proxy_url, async_batch_size)
+            if exec_async
+            else BasetenAPIAdapter(model_id)
+        )
 
         generation_params = VllmGenerationParams(**(generation_params or {}))
         config = BasetenModelConfig(

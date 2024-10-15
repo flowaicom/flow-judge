@@ -64,7 +64,12 @@ class BasetenAPIAdapter(BaseAPIAdapter):
         outputs = []
         for message in request_messages:
             completion = self._make_request(message)
+        try:
             outputs.append(completion.choices[0].message.content.strip())
+        except Exception as e:
+            logger.warning(f"Failed to parse model response: {e}")
+            logger.warning("Returning default value")
+            outputs.append("")
         return outputs
 
 
@@ -94,7 +99,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
-    async def _make_request(self, request_messages: Dict[str, Any]) -> str:
+    async def _make_request(self, request_messages: List[Dict[str, Any]]) -> str:
         model_input = {"messages": request_messages}
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -106,7 +111,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                 },
             ) as response:
                 resp_json = await response.json()
-
                 try:
                     return resp_json["request_id"]
                 except KeyError as e:
@@ -115,6 +119,11 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         logger.error(f"Baseten request failed. {error_msg}")
 
                     logger.error(f"Unable to parse Baseten response: {e}")
+                    return None
+                except Exception as e:
+                    logger.error(f"Unknown error occured with Beseten request."
+                        f"{e}"
+                    )
                     return None
 
     async def _fetch_stream(self, request_id: str) -> str:

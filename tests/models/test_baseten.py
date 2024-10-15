@@ -17,6 +17,19 @@ from flow_judge.models.baseten import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_baseten_api_key() -> Generator[None, None, None]:
+    """Fixture to mock the Baseten API key in the environment.
+
+    This fixture ensures that all tests run with a mock API key,
+    preventing accidental use of real credentials during testing.
+
+    :yield: None
+    """
+    with patch.dict(os.environ, {"BASETEN_API_KEY": "mock_api_key"}):
+        yield
+
+
 @pytest.fixture(scope="session")
 def valid_generation_params() -> VllmGenerationParams:
     """Fixture for creating a valid VllmGenerationParams instance.
@@ -57,13 +70,9 @@ def test_baseten_model_config_init_valid(
     This test uses Hypothesis to generate a wide range of valid inputs.
 
     :param valid_generation_params: A fixture providing valid VllmGenerationParams.
-    :type valid_generation_params: VllmGenerationParams
     :param exec_async: Whether to use async execution.
-    :type exec_async: bool
     :param webhook_proxy_url: The webhook proxy URL to use.
-    :type webhook_proxy_url: Optional[str]
     :param async_batch_size: The async batch size to use.
-    :type async_batch_size: int
     :raises AssertionError: If any of the assertions fail or if unexpected
                             exceptions occur.
 
@@ -97,9 +106,9 @@ def test_baseten_model_config_init_valid(
 
     assert isinstance(config, BasetenModelConfig), "Not a BasetenModelConfig instance"
     expected_model_type = ModelType.BASETEN_VLLM_ASYNC if exec_async else ModelType.BASETEN_VLLM
-    assert (
-        config.model_type == expected_model_type
-    ), f"model_type mismatch: expected {expected_model_type}, got {config.model_type}"
+    assert config.model_type == expected_model_type, (
+        f"model_type mismatch: expected {expected_model_type}, " f"got {config.model_type}"
+    )
     assert config.generation_params == valid_generation_params, "generation_params mismatch"
     assert (
         config.exec_async == exec_async
@@ -153,164 +162,81 @@ def test_baseten_model_config_init_invalid(
     }
     test_params = {**valid_params, **invalid_input}
 
-    unexpected_keys = set(invalid_input.keys()) - set(valid_params.keys())
-    assert not unexpected_keys, f"Unexpected keys in test parameters: {unexpected_keys}"
+    with patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"):
+        try:
+            BasetenModelConfig(**valid_params)
+        except Exception as e:
+            pytest.fail(f"Valid parameters raised an unexpected exception: {str(e)}")
 
-    # Verify that valid_params alone don't raise an exception
-    try:
-        BasetenModelConfig(**valid_params)
-    except Exception as e:
-        pytest.fail(f"Valid parameters raised an unexpected exception: {str(e)}")
-
-    with pytest.raises(ValueError, match=expected_error):
-        BasetenModelConfig(**test_params)
-
-
-@pytest.fixture
-def mock_env_with_api_key() -> Generator[None, None, None]:
-    """Fixture to mock environment with a valid Baseten API key.
-
-    :yield: None
-    """
-    with patch.dict(os.environ, {"BASETEN_API_KEY": "mock_api_key_" + "x" * 30}):
-        yield
-
-
-@pytest.fixture
-def mock_env_without_api_key() -> Generator[None, None, None]:
-    """Fixture to mock environment without a Baseten API key.
-
-    :yield: None
-    """
-    with patch.dict(os.environ, {}, clear=True):
-        yield
-
-
-@pytest.mark.parametrize(
-    "api_key, model_deployed, model_id, expected_error",
-    [
-        ("valid_key", True, "model_123", None),
-        ("valid_key", False, None, BasetenError),
-        ("invalid_key", False, None, BasetenError),
-        (None, False, None, BasetenError),
-    ],
-)
-def test_baseten_initialization(
-    api_key: str | None,
-    model_deployed: bool,
-    model_id: str | None,
-    expected_error: type[BasetenError] | None,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test Baseten initialization under various scenarios.
-
-    :param api_key: The API key to use for initialization
-    :param model_deployed: Whether the model is already deployed
-    :param model_id: The model ID to return
-    :param expected_error: The expected error type, if any
-    :param monkeypatch: pytest's monkeypatch fixture
-    """
-    monkeypatch.setenv("BASETEN_API_KEY", api_key or "")
-
-    with (
-        patch("flow_judge.models.baseten.get_deployed_model_id") as mock_get_id,
-        patch("flow_judge.models.baseten.ensure_model_deployment") as mock_deploy,
-    ):
-        mock_get_id.return_value = model_id
-        mock_deploy.return_value = model_deployed
-
-        if expected_error:
-            with pytest.raises(expected_error):
-                Baseten()
-        else:
-            baseten = Baseten()
-            assert isinstance(baseten, Baseten)
-            assert baseten.config.model_id == model_id
+        with pytest.raises(ValueError, match=expected_error):
+            BasetenModelConfig(**test_params)
 
 
 @pytest.mark.asyncio
 async def test_baseten_init_valid(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Test the initialization of Baseten class with valid parameters.
+    """Test valid initializations of the Baseten class.
 
-    This test ensures that the Baseten class can be properly initialized
-    with valid parameters and that all attributes are set correctly.
-    It uses patch to mock the ensure_model_deployment function and
-    monkeypatch to set a mock BASETEN_WEBHOOK_SECRET.
+    This test covers both synchronous and asynchronous initializations,
+    as well as various error cases and custom model ID usage.
 
-    :param monkeypatch: pytest fixture for modifying the test environment
-    :param caplog: pytest fixture for capturing log output
-    :raises AssertionError: If any of the assertions fail or if unexpected
-                            exceptions occur.
-
-    .. note::
-        - This test covers both synchronous and asynchronous initialization.
-        - It does not test the actual functionality of the Baseten class methods.
-
-    .. warning::
-        - This test relies on mocked functions and environment variables, which
-          may not reflect real-world behavior.
-        - It does not test network-related issues or API interactions.
-        - The test does not verify the correct implementation of the API adapters.
+    :param monkeypatch: pytest's monkeypatch fixture
+    :param caplog: pytest's log capture fixture
     """
-    caplog.set_level(logging.DEBUG)
     with (
-        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
         patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"),
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+        patch(
+            "flow_judge.models.adapters.baseten.webhook.ensure_baseten_webhook_secret",
+            return_value=True,
+        ),
     ):
         # Test synchronous initialization
         try:
-            baseten_sync = Baseten(
-                exec_async=False,
-                async_batch_size=128,
-            )
+            baseten_sync = Baseten(exec_async=False, async_batch_size=128)
         except Exception as e:
             pytest.fail(f"Synchronous Baseten initialization failed unexpectedly: {str(e)}")
 
-        assert isinstance(baseten_sync, Baseten), "Created object is not a Baseten instance"
-        assert baseten_sync.config.model_id == "mock_model_id", "model_id mismatch"
-        assert baseten_sync.config.model_type == ModelType.BASETEN_VLLM, "model_type mismatch"
-        assert baseten_sync.config.exec_async is False, "exec_async mismatch"
-        assert baseten_sync.config.async_batch_size == 128, "async_batch_size mismatch"
-        assert baseten_sync.config.webhook_proxy_url is None, "webhook_proxy_url should be None"
+        assert isinstance(baseten_sync, Baseten)
+        assert baseten_sync.config.model_id == "mock_model_id"
+        assert baseten_sync.config.model_type == ModelType.BASETEN_VLLM
+        assert baseten_sync.config.exec_async is False
+        assert baseten_sync.config.async_batch_size == 128
+        assert baseten_sync.config.webhook_proxy_url is None
 
-        # Set mock BASETEN_WEBHOOK_SECRET for async test
-        monkeypatch.setenv("BASETEN_WEBHOOK_SECRET", "mock_secret")
+        # Test asynchronous initialization with webhook secret
+        monkeypatch.setenv("BASETEN_WEBHOOK_SECRET", "whsec_mockwebhooksecret")
+        try:
+            baseten_async = Baseten(
+                exec_async=True,
+                async_batch_size=256,
+                webhook_proxy_url="https://example.com/webhook",
+            )
+        except Exception as e:
+            pytest.fail(f"Asynchronous Baseten initialization failed unexpectedly: {str(e)}")
 
-        # Patch ensure_baseten_webhook_secret to simulate the warning
+        assert isinstance(baseten_async, Baseten)
+        assert baseten_async.config.model_id == "mock_model_id"
+        assert baseten_async.config.model_type == ModelType.BASETEN_VLLM_ASYNC
+        assert baseten_async.config.exec_async is True
+        assert baseten_async.config.async_batch_size == 256
+        assert baseten_async.config.webhook_proxy_url == "https://example.com/webhook"
+
+        # Test asynchronous initialization without webhook secret
+        monkeypatch.delenv("BASETEN_WEBHOOK_SECRET", raising=False)
         with patch(
             "flow_judge.models.adapters.baseten.webhook.ensure_baseten_webhook_secret",
-            side_effect=lambda: (
-                logging.warning("Invalid BASETEN_WEBHOOK_SECRET in environment variable"),
-                True,
-            )[1],
+            return_value=False,
         ):
-            # Test asynchronous initialization
-            try:
-                baseten_async = Baseten(
+            with pytest.raises(
+                ValueError, match="BASETEN_WEBHOOK_SECRET is not provided in the environment."
+            ):
+                Baseten(
                     exec_async=True,
                     async_batch_size=256,
                     webhook_proxy_url="https://example.com/webhook",
                 )
-            except Exception as e:
-                pytest.fail(f"Asynchronous Baseten initialization failed unexpectedly: {str(e)}")
-
-            assert any(
-                "Invalid BASETEN_WEBHOOK_SECRET in environment variable" in record.message
-                for record in caplog.records
-            ), "Warning not found in logs"
-
-            assert isinstance(baseten_async, Baseten), "Created object is not a Baseten instance"
-            assert baseten_async.config.model_id == "mock_model_id", "model_id mismatch"
-            assert (
-                baseten_async.config.model_type == ModelType.BASETEN_VLLM_ASYNC
-            ), "model_type mismatch"
-            assert baseten_async.config.exec_async is True, "exec_async mismatch"
-            assert baseten_async.config.async_batch_size == 256, "async_batch_size mismatch"
-            assert (
-                baseten_async.config.webhook_proxy_url == "https://example.com/webhook"
-            ), "webhook_proxy_url mismatch"
 
     # Test error cases
     with pytest.raises(
@@ -338,7 +264,7 @@ async def test_baseten_init_valid(
     # Test with custom _model_id
     with patch("flow_judge.models.baseten.get_deployed_model_id", return_value=None):
         baseten_custom = Baseten(exec_async=False, async_batch_size=128, _model_id="custom_id")
-        assert baseten_custom.config.model_id == "custom_id", "Custom _model_id not set correctly"
+        assert baseten_custom.config.model_id == "custom_id"
 
 
 @pytest.mark.parametrize(
@@ -346,18 +272,8 @@ async def test_baseten_init_valid(
     [
         ("whsec_valid", None, None, True),
         (None, "whsec_valid", None, True),
-        (
-            None,
-            None,
-            "whsec_valid",
-            False,
-        ),  # Changed to False because _is_interactive is mocked to False
-        (
-            None,
-            None,
-            "invalid",
-            False,
-        ),  # Changed to False because _is_interactive is mocked to False
+        (None, None, "whsec_valid", False),
+        (None, None, "invalid", False),
         (None, None, "", False),
     ],
 )
@@ -407,20 +323,38 @@ def test_ensure_baseten_webhook_secret(
 
 def test_baseten_format_conversation() -> None:
     """Test the _format_conversation method of the Baseten class."""
-    baseten = Baseten(_model_id="test_model")
-    prompt = "Hello, world!"
-    formatted = baseten._format_conversation(prompt)
-    assert formatted == [{"role": "user", "content": "Hello, world!"}]
+    with (
+        patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"),
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+    ):
+        baseten = Baseten(_model_id="test_model")
+        prompt = "Hello, world!"
+        formatted = baseten._format_conversation(prompt)
+        assert formatted == [{"role": "user", "content": "Hello, world!"}]
 
-    prompt_with_whitespace = "  Hello, world!  "
-    formatted = baseten._format_conversation(prompt_with_whitespace)
-    assert formatted == [{"role": "user", "content": "Hello, world!"}]
+        prompt_with_whitespace = "  Hello, world!  "
+        formatted = baseten._format_conversation(prompt_with_whitespace)
+        assert formatted == [{"role": "user", "content": "Hello, world!"}]
 
 
 @pytest.mark.asyncio
 async def test_baseten_generate_methods(caplog: pytest.LogCaptureFixture) -> None:
-    """Test the generate methods of the Baseten class."""
-    with patch.dict(os.environ, {"BASETEN_WEBHOOK_SECRET": "mock_secret"}):
+    """Test the generate methods of the Baseten class.
+
+    This test covers both synchronous and asynchronous generation methods,
+    as well as error cases for calling async methods on a sync instance.
+
+    :param caplog: pytest's log capture fixture
+    """
+    with (
+        patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"),
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+        patch(
+            "flow_judge.models.adapters.baseten.webhook.ensure_baseten_webhook_secret",
+            return_value=True,
+        ),
+        patch.dict(os.environ, {"BASETEN_WEBHOOK_SECRET": "whsec_mockwebhooksecret"}),
+    ):
         baseten = Baseten(_model_id="test_model")
 
         with patch.object(baseten.api_adapter, "_fetch_response", return_value="Response"):

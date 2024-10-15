@@ -12,6 +12,7 @@ from hypothesis import strategies as st
 from pytest import LogCaptureFixture, MonkeyPatch
 
 from flow_judge.models.adapters.baseten.deploy import ensure_model_deployment
+from flow_judge.models.adapters.baseten.webhook import ensure_baseten_webhook_secret
 from flow_judge.models.baseten import (
     Baseten,
     BasetenError,
@@ -403,57 +404,83 @@ async def test_baseten_init_valid(
 
 
 @pytest.mark.parametrize(
-    "env_secret, stored_secret, user_input, expected_result",
+    "env_secret, stored_secret, is_interactive, expected_result, expected_logs, expect_output",
     [
-        ("whsec_valid", None, None, True),
-        (None, "whsec_valid", None, True),
-        (None, None, "whsec_valid", False),
-        (None, None, "invalid", False),
-        (None, None, "", False),
+        (
+            "whsec_valid",
+            None,
+            False,
+            True,
+            ["Found BASETEN_WEBHOOK_SECRET in environment variables"],
+            False,
+        ),
+        (None, "whsec_valid", False, True, ["Found stored webhook secret"], False),
+        (None, None, False, False, ["Non-interactive environment detected"], True),
+        (None, None, True, True, ["Prompting user for webhook secret"], True),
     ],
 )
 def test_ensure_baseten_webhook_secret(
     env_secret: str | None,
     stored_secret: str | None,
-    user_input: str | None,
+    is_interactive: bool,
     expected_result: bool,
+    expected_logs: list[str],
+    expect_output: bool,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: LogCaptureFixture,
 ) -> None:
-    """Test the ensure_baseten_webhook_secret function.
+    """Test the ensure_baseten_webhook_secret function comprehensively.
 
     :param env_secret: The secret to set in the environment
     :param stored_secret: The secret to return as stored
-    :param user_input: The user input to simulate
+    :param is_interactive: Whether the environment is interactive
     :param expected_result: The expected result of the function
+    :param expected_logs: Expected log messages
+    :param expect_output: Whether to expect console output
     :param monkeypatch: pytest's monkeypatch fixture
+    :param caplog: pytest's log capture fixture
     """
-    from flow_judge.models.adapters.baseten.webhook import ensure_baseten_webhook_secret
-
     if env_secret:
         monkeypatch.setenv("BASETEN_WEBHOOK_SECRET", env_secret)
     else:
         monkeypatch.delenv("BASETEN_WEBHOOK_SECRET", raising=False)
 
-    with (
-        patch("flow_judge.models.adapters.baseten.webhook._get_stored_secret") as mock_get_stored,
-        patch("flow_judge.models.adapters.baseten.webhook._is_interactive", return_value=False),
-        patch("getpass.getpass") as mock_getpass,
-        patch("flow_judge.models.adapters.baseten.webhook._save_webhook_secret") as mock_save,
-    ):
-        mock_get_stored.return_value = stored_secret
-        mock_getpass.return_value = user_input
+    captured_output = StringIO()
+    sys.stdout = captured_output
 
-        result = ensure_baseten_webhook_secret()
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "flow_judge.models.adapters.baseten.webhook._get_stored_secret"
+        ) as mock_get_stored:
+            with patch(
+                "flow_judge.models.adapters.baseten.webhook._is_interactive"
+            ) as mock_interactive:
+                with patch("getpass.getpass", return_value="whsec_valid"):
+                    with patch("flow_judge.models.adapters.baseten.webhook._save_webhook_secret"):
+                        mock_get_stored.return_value = stored_secret
+                        mock_interactive.return_value = is_interactive
+                        result = ensure_baseten_webhook_secret()
 
-        assert result == expected_result
+    sys.stdout = sys.__stdout__
 
-        if env_secret:
-            mock_get_stored.assert_not_called()
-        elif stored_secret:
-            mock_get_stored.assert_called_once()
+    assert result == expected_result, f"Expected {expected_result}, got {result}"
+    for log in expected_logs:
+        assert any(log in record.message for record in caplog.records), f"Missing log: {log}"
+
+    if expect_output:
+        if is_interactive:
+            assert (
+                "To run Flow Judge remotely with Baseten and enable async execution"
+                in captured_output.getvalue()
+            )
+            assert "Warning: Invalid webhook secret" in captured_output.getvalue()
         else:
-            mock_getpass.assert_not_called()  # Because _is_interactive is False
-            mock_save.assert_not_called()
+            assert (
+                "Set the Baseten webhook secret in the BASETEN_WEBHOOK_SECRET"
+                in captured_output.getvalue()
+            )
+    else:
+        assert captured_output.getvalue() == "", f"Unexpected output: {captured_output.getvalue()}"
 
 
 def test_baseten_format_conversation() -> None:

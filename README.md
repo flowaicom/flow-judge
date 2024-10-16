@@ -37,7 +37,11 @@
 <a href="https://github.com/flowaicom/flow-judge/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/static/v1?label=license&message=Apache%202.0&color=white" alt="License">
 </a>
+<a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fflowaicom%2Fflow-judge?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fflowaicom%2Fflow-judge.svg?type=shield"/></a>
 </p>
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fflowaicom%2Fflow-judge.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fflowaicom%2Fflow-judge?ref=badge_large)
 
 ## Model
 `Flow-Judge-v0.1` is an open, small yet powerful language model evaluator trained on a synthetic dataset containing LLM system evaluation data by Flow AI.

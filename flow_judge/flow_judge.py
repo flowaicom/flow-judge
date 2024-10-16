@@ -4,7 +4,6 @@ import logging
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.metrics import CustomMetric, Metric
 from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
-from flow_judge.utils.prompt_formatter import format_rubric, format_user_prompt, format_vars
 from flow_judge.utils.result_writer import write_results_to_disk
 from flow_judge.utils.validators import validate_eval_input
 
@@ -19,7 +18,7 @@ class BaseFlowJudge:
         self,
         metric: Metric | CustomMetric,
         model: BaseFlowJudgeModel | AsyncBaseFlowJudgeModel,
-        output_dir: str | None = "output/",
+        output_dir: str = "output/",
     ):
         """Initialize BaseFlowJudge with a metric and model."""
         if not isinstance(metric, (Metric, CustomMetric)):
@@ -30,13 +29,7 @@ class BaseFlowJudge:
 
     def _format_prompt(self, eval_input: EvalInput) -> str:
         """Format the prompt for a single evaluation input."""
-        prompt_variables = {
-            "INPUTS": format_vars(eval_input.inputs),
-            "OUTPUT": format_vars([eval_input.output]),
-            "EVALUATION_CRITERIA": self.metric.criteria,
-            "RUBRIC": format_rubric(self.metric.rubric),
-        }
-        return format_user_prompt(prompt_variables)
+        return self.metric.format_prompt(eval_input.dict())
 
     def _validate_inputs(self, eval_inputs: EvalInput | list[EvalInput]):
         """Validate required inputs and output against the metric."""
@@ -102,7 +95,6 @@ class FlowJudge(BaseFlowJudge):
             self._save_results(eval_inputs, eval_outputs)
         if parse_failures > 0:
             logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")
-
         return eval_outputs
 
 
@@ -152,8 +144,6 @@ class AsyncFlowJudge(BaseFlowJudge):
         parse_failures = sum(1 for output in eval_outputs if output.score == -1)
         if save_results:
             await asyncio.to_thread(self._save_results, eval_inputs, eval_outputs)
-
         if parse_failures > 0:
             logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")
-
         return eval_outputs

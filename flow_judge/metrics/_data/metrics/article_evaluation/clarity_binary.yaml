@@ -1,0 +1,12 @@
+name: article_clarity
+description: Evaluates the clarity and readability of an article
+criteria: Does the article's writing quality in terms of clarity, conciseness, and ease of understanding communicate effectively the information to the reader?
+rubric:
+  - score: 0
+    description: The article's writing quality is poor to moderate in terms of clarity, conciseness, and ease of understanding. It may have confusing sentence structures, inappropriate vocabulary, lack of organization, or instances of unnecessary verbosity. The writing does not effectively communicate the information to the reader, making it difficult to comprehend the content without significant effort.
+  - score: 1
+    description: The article's writing quality is high in terms of clarity, conciseness, and ease of understanding. It features well-constructed sentences, appropriate vocabulary, logical organization, and efficient conveyance of information. The writing effectively communicates the information to the reader, allowing for easy comprehension and a smooth reading experience.
+required_inputs:
+  - user_instructions
+  - context
+required_output: article

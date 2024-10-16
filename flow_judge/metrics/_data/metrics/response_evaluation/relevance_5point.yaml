@@ -1,0 +1,18 @@
+name: response_relevance_5point
+description: Evaluates the relevance of a response to the given query using a 5-point Likert scale
+criteria: How well does the response address the query, providing relevant information without including anything extraneous or irrelevant?
+rubric:
+  - score: 1
+    description: The response is completely irrelevant to the query, does not address it at all, or contains only extraneous information unrelated to the query. It fails to provide any information that answers the question or addresses the topic at hand. The response may be entirely off-topic, discuss unrelated subjects, or provide information that has no connection to the query. It offers no value in terms of answering the original question.
+  - score: 2
+    description: The response is mostly irrelevant to the query, addressing it only tangentially or containing significant amounts of unrelated or extraneous information. While there may be small elements that relate to the query, the majority of the content does not contribute to answering the question. The response largely misses the point of the query, focusing on peripheral or unimportant aspects while neglecting the core issues that need to be addressed.
+  - score: 3
+    description: The response is somewhat relevant to the query, addressing the main point but going off-topic or including some extraneous details. Key aspects of the query may not be addressed. The response demonstrates a basic understanding of the query but lacks focus or precision. It may provide some useful information mixed with irrelevant details, or it might address only part of the query while ignoring other important elements. The overall relevance is moderate, with clear room for improvement.
+  - score: 4
+    description: The response is largely relevant to the query, addressing the key points without much extraneous information. It may not cover all aspects of the query exhaustively, but it provides a substantive and pertinent answer to the main issues raised. The majority of the information presented is directly related to the query, with only minor digressions or slightly extraneous details. The response demonstrates a good understanding of the query's requirements and delivers mostly relevant content.
+  - score: 5
+    description: The response is highly relevant to the query, addressing all key aspects directly and thoroughly without any irrelevant or extraneous information. It provides a comprehensive and focused answer that aligns perfectly with the query's requirements. Every part of the response contributes directly to addressing the question at hand, demonstrating a complete understanding of the query and delivering information that is entirely pertinent. The response is concise yet complete, offering maximum relevance to the given query.
+required_inputs:
+  - query
+  - context
+required_output: response

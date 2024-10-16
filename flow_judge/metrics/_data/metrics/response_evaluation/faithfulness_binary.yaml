@@ -1,0 +1,12 @@
+name: response_faithfulness_binary
+description: Evaluates the faithfulness of a response to the provided context in a binary manner
+criteria: Based on the provided context, does the response contain only information that is supported by or directly inferable from the context?
+rubric:
+  - score: 0
+    description: The response contains statements or claims that cannot be directly found in or logically inferred from the provided context. There is hallucinated or fabricated information present in the response that does not have support in the given context. This may include introducing new facts, making unsupported generalizations, or drawing conclusions that go beyond what the context allows. The response demonstrates a lack of faithfulness to the provided information, potentially misleading the reader or introducing inaccuracies.
+  - score: 1
+    description: The response contains only statements and claims that are directly stated in or logically inferable from the provided context. There is no hallucinated or fabricated information present in the response that cannot be traced back to or deduced from the context. The response demonstrates strict adherence to the given information, making only claims that are fully supported by the context. Any inferences or conclusions drawn are logical and well-grounded in the provided material, ensuring that the response remains faithful to the original context without introducing unsupported information.
+required_inputs:
+  - query
+  - context
+required_output: response

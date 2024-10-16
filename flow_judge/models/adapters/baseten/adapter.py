@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import aiohttp
 from openai import OpenAI, OpenAIError
@@ -101,7 +101,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
-    async def _make_request(self, request_messages: List[Dict[str, Any]]) -> str:
+    async def _make_request(self, request_messages: list[dict[str, Any]]) -> str:
         model_input = {"messages": request_messages}
         async with aiohttp.ClientSession() as session:
             async with session.post(

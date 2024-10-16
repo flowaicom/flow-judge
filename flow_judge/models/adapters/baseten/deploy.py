@@ -9,6 +9,8 @@ import truss
 from truss.remote import remote_factory
 from truss.remote.baseten.error import ApiError
 
+from .gpu import ensure_gpu
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -44,6 +46,10 @@ def _initialize_model() -> bool:
     if _is_flowjudge_deployed():
         logger.info("Flow Judge already deployed")
         return True
+
+    if not ensure_gpu():
+        logger.error("BASETEN_GPU environment variable is required." " Set one of: H100 or A10G")
+        return False
 
     truss_path: str = f"{os.path.dirname(os.path.realpath(os.path.abspath(__file__)))}/deployment"
     logger.debug(f"Truss path: {truss_path}")

@@ -48,7 +48,7 @@ class TestValidateBasetenSignature:
             # Mock valid signature
             valid_signature = hmac.digest(
                 mock_webhook_secret.encode("utf-8"),
-                "mock_model_dump_json".encode("utf-8"),
+                b"mock_model_dump_json",
                 hashlib.sha256,
             ).hex()
 
@@ -95,7 +95,7 @@ class TestValidateBasetenSignature:
             # Mock valid signature
             valid_signature = hmac.digest(
                 mock_webhook_secret.encode("utf-8"),
-                "mock_model_dump_json".encode("utf-8"),
+                b"mock_model_dump_json",
                 hashlib.sha256,
             ).hex()
 
@@ -120,7 +120,7 @@ class TestValidateBasetenSignature:
             # Mock valid signature
             valid_signature = hmac.digest(
                 mock_webhook_secret.encode("utf-8"),
-                "mock_model_dump_json".encode("utf-8"),
+                b"mock_model_dump_json",
                 hashlib.sha256,
             ).hex()
 

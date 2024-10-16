@@ -298,3 +298,10 @@ without any irrelevant or extraneous information.""",
     required_inputs=["query", "context"],
     required_output="response",
 )
+
+
+def list_all_metrics():
+    """List all metric variable names."""
+    return [
+        name for name, value in globals().items() if isinstance(value, Metric) and name.isupper()
+    ]

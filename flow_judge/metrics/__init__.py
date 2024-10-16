@@ -1,4 +1,4 @@
-from flow_judge.metrics.metric import CustomMetric, Metric, RubricItem, list_all_metrics
+from flow_judge.metrics.metric import CustomMetric, Metric, RubricItem
 from flow_judge.metrics.presets import (
     RESPONSE_CORRECTNESS_3POINT,
     RESPONSE_CORRECTNESS_5POINT,
@@ -9,4 +9,5 @@ from flow_judge.metrics.presets import (
     RESPONSE_RELEVANCE_3POINT,
     RESPONSE_RELEVANCE_5POINT,
     RESPONSE_RELEVANCE_BINARY,
+    list_all_metrics,
 )

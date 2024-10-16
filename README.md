@@ -308,12 +308,23 @@ We support an integration with Llama Index evaluation module and Haystack:
    pre-commit install
    ```
 
-6. Run pre-commit on all files:
+6. Make sure you have trufflehog installed:
+   ```bash
+   # make trufflehog available in your path
+   # macos
+   brew install trufflehog
+   # linux
+   curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+   # nix
+   nix profile install nixpkgs#trufflehog
+   ```
+
+7. Run pre-commit on all files:
    ```bash
    pre-commit run --all-files
    ```
 
-7. You're now ready to start developing! You can run the main script with:
+8. You're now ready to start developing! You can run the main script with:
    ```bash
    python -m flow_judge
    ```

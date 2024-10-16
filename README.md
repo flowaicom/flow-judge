@@ -8,7 +8,7 @@
   <strong>
     <a href="https://www.flow-ai.com/judge">Technical Report</a> |
     <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
-    <a href="https://huggingface.co/spaces/flowaicom/Flow-Judge-v0.1">HuggingFace Space</a> |   
+    <a href="https://huggingface.co/spaces/flowaicom/Flow-Judge-v0.1">HuggingFace Space</a> |
     <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
     <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Tutorials</a>
   </strong>

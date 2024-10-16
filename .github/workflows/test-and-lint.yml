@@ -12,6 +12,8 @@ jobs:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for trufflehog
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -36,6 +38,13 @@ jobs:
           echo "pyupgrade would make changes. Please run pyupgrade locally and commit the changes."
           exit 1
         fi
+    - name: Run TruffleHog
+      uses: trufflesecurity/trufflehog@v3.82.6
+      with:
+        path: ./
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+        extra_args: --only-verified --fail --exclude-paths=.truffleignore
 
   test:
     needs: lint

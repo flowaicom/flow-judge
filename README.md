@@ -8,7 +8,7 @@
   <strong>
     <a href="https://www.flow-ai.com/judge">Technical Report</a> |
     <a href="https://huggingface.co/collections/flowaicom/flow-judge-v01-66e6af5fc3b3a128bde07dec">Model Weights</a> |
-    <a href="https://huggingface.co/spaces/flowaicom/Flow-Judge-v0.1">HuggingFace Space</a> |   
+    <a href="https://huggingface.co/spaces/flowaicom/Flow-Judge-v0.1">HuggingFace Space</a> |
     <a href="https://github.com/flowaicom/lm-evaluation-harness/tree/Flow-Judge-v0.1_evals/lm_eval/tasks/flow_judge_evals">Evaluation Code</a> |
     <a href="https://github.com/flowaicom/flow-judge/tree/main/examples">Tutorials</a>
   </strong>
@@ -308,12 +308,23 @@ We support an integration with Llama Index evaluation module and Haystack:
    pre-commit install
    ```
 
-6. Run pre-commit on all files:
+6. Make sure you have trufflehog installed:
+   ```bash
+   # make trufflehog available in your path
+   # macos
+   brew install trufflehog
+   # linux
+   curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+   # nix
+   nix profile install nixpkgs#trufflehog
+   ```
+
+7. Run pre-commit on all files:
    ```bash
    pre-commit run --all-files
    ```
 
-7. You're now ready to start developing! You can run the main script with:
+8. You're now ready to start developing! You can run the main script with:
    ```bash
    python -m flow_judge
    ```

@@ -42,4 +42,4 @@ repos:
         name: TruffleHog
         description: Detect secrets in your data with TruffleHog.
         entry: trufflehog git file://. --only-verified --no-update --fail --exclude-globs=".venv/*"
-        language: golang
+        language: system

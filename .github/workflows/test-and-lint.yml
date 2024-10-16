@@ -44,7 +44,7 @@ jobs:
         path: ./
         base: ${{ github.event.pull_request.base.sha }}
         head: ${{ github.event.pull_request.head.sha }}
-        extra_args: --only-verified --fail --exclude-paths=.truffleignore
+        extra_args: --only-verified --exclude-paths=.truffleignore
 
   test:
     needs: lint

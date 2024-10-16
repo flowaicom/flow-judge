@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import aiohttp
 from openai import OpenAI, OpenAIError
@@ -101,7 +101,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
-    async def _make_request(self, request_messages: List[Dict[str, Any]]) -> str:
+    async def _make_request(self, request_messages: list[dict[str, Any]]) -> str:
         model_input = {"messages": request_messages}
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -126,11 +126,37 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     logger.error(f"Unknown error occured with Beseten request." f"{e}")
                     return None
 
+    async def _get_stream_token(self, request_id: str) -> str | None:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{self.webhook_proxy_url}/token", json={"request_id": request_id}
+            ) as response:
+                try:
+                    resp = await response.json()
+                    return resp["token"]
+                except KeyError as e:
+                    logger.error(f"Unable to parse stream token response: {e}")
+                    return None
+                except Exception as e:
+                    logger.error(f"Cannot retrieve stream token." f"{e}")
+                    return None
+
     async def _fetch_stream(self, request_id: str) -> str:
         if request_id is None:
             return ""
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{self.webhook_proxy_url}/listen/{request_id}") as response:
+            token = await self._get_stream_token(request_id)
+            if token is None:
+                logger.error(
+                    "Unable to retrieve the stream token. "
+                    f"Cannot connect to the proxy for request_id={request_id}."
+                )
+                return ""
+
+            async with session.get(
+                f"{self.webhook_proxy_url}/listen/{request_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            ) as response:
                 message = ""
                 signature = ""
 

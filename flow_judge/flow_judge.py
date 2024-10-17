@@ -134,6 +134,7 @@ class AsyncFlowJudge(BaseFlowJudge):
             logger.error(f"Asynchronous evaluation failed: {e}")
             raise
 
+    # TODO: figure if we want to have the parser be passed the fail_on_parse_error flag
     async def async_batch_evaluate(
         self,
         eval_inputs: list[EvalInput],
@@ -149,6 +150,7 @@ class AsyncFlowJudge(BaseFlowJudge):
             EvalOutput.parse(response, fail_on_parse_error=fail_on_parse_error)
             for response in responses
         ]
+
         parse_failures = sum(1 for output in eval_outputs if output.score == -1)
         if save_results:
             await asyncio.to_thread(self._save_results, eval_inputs, eval_outputs)

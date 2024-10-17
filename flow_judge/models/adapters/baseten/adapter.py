@@ -187,31 +187,6 @@ class TokenBucket:
         return False
 
 
-class SanitizedRequestMessage(BaseModel):
-    """A sanitized and validated version of the RequestMessage.
-
-    This class ensures that the input message conforms to expected formats and
-    is free from potentially harmful content.
-
-    Attributes:
-        id (str): A unique identifier for the request (1-100 characters).
-        content (str): The sanitized content of the request (1-10000 characters).
-
-    Note:
-        The content field is sanitized using the bleach library to remove potentially
-        harmful HTML. Be aware that this may alter the original content.
-    """
-
-    id: str = Field(..., min_length=1, max_length=100)
-    content: str = Field(..., min_length=1, max_length=10000)
-
-    @field_validator("content")
-    @classmethod
-    def sanitize_content(cls, v):
-        """Sanitize the content field to remove potentially harmful HTML."""
-        return bleach.clean(v)
-
-
 class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
     """Asynchronous API adapter for Baseten model interactions.
 
@@ -414,8 +389,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             It will attempt to process the request up to self.max_retries times
             before giving up and returning a FlowJudgeError.
         """
-        sanitized_message = SanitizedRequestMessage(**message)
-
         @retry(
             stop=stop_after_attempt(self.max_retries),
             wait=wait_exponential(min=self.retry_min_wait, max=self.retry_max_wait),
@@ -423,24 +396,24 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         )
         async def _attempt_request():
             async with self.semaphore:
-                request_id = await self._make_request([sanitized_message.dict()])
+                request_id = await self._make_request([message.dict()])
                 return await self._fetch_stream(request_id)
 
         try:
             response = await _attempt_request()
-            return EvalOutput(id=sanitized_message.id, content=response)
+            return EvalOutput(id=message.id, content=response)
         except RetryError as e:
             return FlowJudgeError(
                 error_type="RetryError",
                 error_message=str(e),
-                request_id=sanitized_message.id,
+                request_id=message.id,
                 retry_count=self.max_retries,
             )
         except (BasetenAPIError, ValueError) as e:
             return FlowJudgeError(
                 error_type=type(e).__name__,
                 error_message=str(e),
-                request_id=sanitized_message.id,
+                request_id=message.id,
             )
 
     async def process_batch(self, batch: list[EvalInput]) -> BatchResult:
@@ -606,26 +579,3 @@ class BasetenFlowJudge(BaseFlowJudge):
             )
 
         return all_outputs
-
-    async def get_metrics(self) -> list[Metric]:
-        """Get metrics for the evaluation process.
-
-        Returns:
-            List[Metric]: A list of metrics about the evaluation process.
-
-        Note:
-            This method returns custom metrics related to the Baseten API usage.
-            Extend this method to include additional metrics as needed.
-        """
-        return [
-            CustomMetric(
-                name="baseten_api_calls",
-                value=self.adapter.rate_limiter.capacity - self.adapter.rate_limiter.tokens,
-                description="Number of Baseten API calls made during evaluation",
-            ),
-            CustomMetric(
-                name="baseten_rate_limit",
-                value=self.adapter.rate_limit,
-                description="Rate limit for Baseten API calls (requests per minute)",
-            ),
-        ]

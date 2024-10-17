@@ -9,7 +9,7 @@ import aiohttp
 import bleach
 import structlog
 from pydantic import BaseModel, Field, field_validator
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
 
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.flow_judge import AsyncBaseAPIAdapter, BaseFlowJudge
@@ -65,6 +65,14 @@ class FlowJudgeError(BaseModel):
         None, description="Raw response from Baseten or proxy, if available"
     )
 
+    @field_validator("error_type", "error_message", "request_id")
+    @classmethod
+    def check_non_empty_string(cls, v):
+        """Placeholder."""
+        if not v.strip():
+            raise ValueError("Field must not be empty or just whitespace")
+        return v
+
 
 class BatchResult(BaseModel):
     """Represents the result of a batch evaluation process.
@@ -92,6 +100,22 @@ class BatchResult(BaseModel):
     )
     total_requests: int = Field(..., description="Total number of requests processed")
     success_rate: float = Field(..., description="Rate of successful evaluations")
+
+    @field_validator("total_requests")
+    @classmethod
+    def check_positive_total_requests(cls, v):
+        """Placeholder."""
+        if v <= 0:
+            raise ValueError("total_requests must be positive")
+        return v
+
+    @field_validator("success_rate")
+    @classmethod
+    def check_success_rate_range(cls, v):
+        """Placeholder."""
+        if not 0 <= v <= 1:
+            raise ValueError("success_rate must be between 0 and 1")
+        return v
 
 
 class BasetenAPIError(Exception):
@@ -259,7 +283,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         if retry_min_wait > retry_max_wait:
             raise ValueError("retry_min_wait must not exceed retry_max_wait")
 
-        super().__init__(f"https://model-{model_id}.api.baseten.co/production")
         self.model_id = model_id
         self.webhook_proxy_url = webhook_proxy_url
         self.batch_size = batch_size
@@ -375,11 +398,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
                 return message
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=60),
-        retry_error_callback=lambda retry_state: retry_state.outcome.result(),
-    )
     async def _process_request_with_retry(
         self, message: RequestMessage
     ) -> EvalOutput | FlowJudgeError:
@@ -393,188 +411,221 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
         Note:
             This method implements a retry mechanism with exponential backoff.
-            It will attempt to process the request up to 3 times before giving up.
-            The wait time between retries increases exponentially, starting at 1 second
-            and capped at 60 seconds. These values are fixed in the decorator and do not
-            use the instance variables for technical reasons. If different retry behavior
-            is needed, consider implementing a custom retry decorator.
+            It will attempt to process the request up to self.max_retries times
+            before giving up and returning a FlowJudgeError.
         """
-        async with self.semaphore:
-            try:
-                response = await asyncio.wait_for(
-                    self._make_request([message]), timeout=self.request_timeout
-                )
-                parsed_response = await self._fetch_stream(response)
-                return EvalOutput.parse(parsed_response)
-            except asyncio.TimeoutError:
-                return FlowJudgeError(
-                    error_type="TimeoutError",
-                    error_message=f"Request timed out after {self.request_timeout} seconds",
-                    request_id=message["id"],
-                )
-            except Exception as e:
-                return FlowJudgeError(
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    request_id=message["id"],
-                )
+        sanitized_message = SanitizedRequestMessage(**message)
 
-    async def _async_fetch_batched_response(
-        self, request_messages: list[RequestMessage]
-    ) -> BatchResult:
-        """Fetch batched responses asynchronously with retry mechanism.
+        @retry(
+            stop=stop_after_attempt(self.max_retries),
+            wait=wait_exponential(min=self.retry_min_wait, max=self.retry_max_wait),
+            reraise=True,
+        )
+        async def _attempt_request():
+            async with self.semaphore:
+                request_id = await self._make_request([sanitized_message.dict()])
+                return await self._fetch_stream(request_id)
+
+        try:
+            response = await _attempt_request()
+            return EvalOutput(id=sanitized_message.id, content=response)
+        except RetryError as e:
+            return FlowJudgeError(
+                error_type="RetryError",
+                error_message=str(e),
+                request_id=sanitized_message.id,
+                retry_count=self.max_retries,
+            )
+        except (BasetenAPIError, ValueError) as e:
+            return FlowJudgeError(
+                error_type=type(e).__name__,
+                error_message=str(e),
+                request_id=sanitized_message.id,
+            )
+
+    async def process_batch(self, batch: list[EvalInput]) -> BatchResult:
+        """Process a batch of evaluation inputs asynchronously.
 
         Args:
-            request_messages (List[RequestMessage]): List of request messages to process.
+            batch (List[EvalInput]): A list of evaluation inputs to process.
 
         Returns:
-            BatchResult: The result of the batch evaluation,
-            including successful outputs and errors.
+            BatchResult: An object containing successful outputs and errors.
 
         Note:
-            This method processes all requests concurrently. While this improves throughput,
-            it may lead to increased resource usage. Monitor system resources when processing
-            large batches. The method also respects rate limits, which may cause some requests
-            to be delayed if the rate limit is reached.
+            This method processes each input in the batch concurrently, up to
+            the rate limit. It aggregates results and errors into a BatchResult.
         """
-        results = BatchResult(
-            successful_outputs=[],
-            errors=[],
-            total_requests=len(request_messages),
-            success_rate=0.0,
-        )
+        tasks = [
+            self._process_request_with_retry(RequestMessage(id=input.id, content=input.content))
+            for input in batch
+        ]
+        results = await asyncio.gather(*tasks)
 
-        # Process all requests with retry
-        all_results = await asyncio.gather(
-            *[self._process_request_with_retry(msg) for msg in request_messages]
-        )
-
-        for result in all_results:
+        successful_outputs = []
+        errors = []
+        for result in results:
             if isinstance(result, EvalOutput):
-                results.successful_outputs.append(result)
+                successful_outputs.append(result)
             elif isinstance(result, FlowJudgeError):
-                results.errors.append(result)
+                errors.append(result)
 
-        results.success_rate = len(results.successful_outputs) / results.total_requests
-        return results
+        total_requests = len(batch)
+        success_rate = len(successful_outputs) / total_requests if total_requests > 0 else 0
+
+        return BatchResult(
+            successful_outputs=successful_outputs,
+            errors=errors,
+            total_requests=total_requests,
+            success_rate=success_rate,
+        )
+
+    async def _get_stream_token(self, request_id: str) -> str | None:
+        """Retrieve the stream token for a given request ID.
+
+        Args:
+            request_id (str): The ID of the request to fetch the token for.
+
+        Returns:
+            Optional[str]: The stream token if successful, None otherwise.
+
+        Raises:
+            BasetenRequestError: If there's an error fetching the token.
+            BasetenResponseError: If the response doesn't contain a valid token.
+
+        Note:
+            This method is used internally to authenticate stream requests.
+            It should not be called directly by users of the adapter.
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.webhook_proxy_url}/token/{request_id}") as response:
+                    if response.status != 200:
+                        raise BasetenRequestError(f"Failed to fetch token: HTTP {response.status}")
+                    data = await response.json()
+                    if "token" not in data:
+                        raise BasetenResponseError("Response does not contain a token")
+                    return data["token"]
+        except aiohttp.ClientError as e:
+            raise BasetenRequestError(f"Network error while fetching token: {str(e)}") from e
+        except json.JSONDecodeError as e:
+            raise BasetenResponseError(f"Invalid JSON response for token: {str(e)}") from e
 
 
-class AsyncFlowJudge(BaseFlowJudge):
-    """Asynchronous Flow Judge for batch evaluations.
+class BasetenFlowJudge(BaseFlowJudge):
+    """Flow Judge implementation using the Baseten API.
 
-    This class provides methods for asynchronously evaluating batches of inputs
-    using a specified metric and Baseten model. It handles concurrent processing,
-    error management, and result aggregation.
+    This class extends BaseFlowJudge to provide evaluation functionality
+    using the Baseten API for model inference.
 
     Attributes:
-        metric (Union[Metric, CustomMetric]): The metric used for evaluation.
-        model (AsyncBasetenAPIAdapter): The async Baseten API adapter.
-        output_dir (str): Directory to save output.
+        adapter (AsyncBasetenAPIAdapter): The adapter for making API calls to Baseten.
 
     Note:
-        This class is designed for high-throughput, asynchronous processing. Be aware
-        of potential resource constraints when evaluating large batches. Consider
-        implementing additional safeguards (e.g., batch size limits) for production use.
+        This implementation assumes that the Baseten model is configured to
+        handle the specific evaluation task. Ensure that the model input and
+        output formats match the expectations of this class.
     """
 
     def __init__(
         self,
-        metric: Metric | CustomMetric,
-        model: AsyncBasetenAPIAdapter,
-        output_dir: str | None = "output/",
+        model_id: str,
+        webhook_proxy_url: str,
+        batch_size: int,
+        max_retries: int = 3,
+        request_timeout: float = 30.0,
+        rate_limit: int = 20,
+        retry_min_wait: float = 1.0,
+        retry_max_wait: float = 60.0,
     ):
-        """Initialize the AsyncFlowJudge.
+        """Initialize the BasetenFlowJudge.
 
         Args:
-            metric (Union[Metric, CustomMetric]): The metric to use for evaluation.
-            model (AsyncBasetenAPIAdapter): The async Baseten API adapter.
-            output_dir (Optional[str]): Directory to save output. Defaults to "output/".
+            model_id (str): The ID of the Baseten model to use for evaluation.
+            webhook_proxy_url (str): The URL of the webhook proxy for async requests.
+            batch_size (int): The number of inputs to process in each batch.
+            max_retries (int): Maximum number of retry attempts for failed requests.
+            request_timeout (float): Timeout for individual requests in seconds.
+            rate_limit (int): Maximum number of requests per minute.
+            retry_min_wait (float): Minimum wait time between retries in seconds.
+            retry_max_wait (float): Maximum wait time between retries in seconds.
 
         Raises:
-            ValueError: If the model is not an instance of AsyncBasetenAPIAdapter.
+            ValueError: If any of the input parameters are invalid.
 
         Note:
-            Ensure that the provided metric is compatible with the model's output format.
-            Incompatible metrics may lead to parsing errors or incorrect evaluations.
+            The retry and rate limiting parameters should be tuned based on
+            the specific characteristics of your Baseten model and use case.
         """
-        if not isinstance(model, AsyncBasetenAPIAdapter):
-            raise ValueError("model must be an instance of AsyncBasetenAPIAdapter")
-        super().__init__(metric, model, output_dir)
-        self.model: AsyncBasetenAPIAdapter = model
+        super().__init__()
+        self.adapter = AsyncBasetenAPIAdapter(
+            model_id,
+            webhook_proxy_url,
+            batch_size,
+            max_retries,
+            request_timeout,
+            rate_limit,
+            retry_min_wait,
+            retry_max_wait,
+        )
 
-    async def async_batch_evaluate(
-        self,
-        eval_inputs: list[EvalInput],
-        use_tqdm: bool = True,
-        save_results: bool = True,
-        fail_on_parse_error: bool = False,
-        batch_timeout: float = 300.0,
-    ) -> BatchResult:
-        """Asynchronously evaluate a batch of inputs with a timeout.
+    async def evaluate(self, eval_inputs: list[EvalInput]) -> list[EvalOutput]:
+        """Evaluate a list of inputs using the Baseten model.
 
         Args:
-            eval_inputs (List[EvalInput]): List of evaluation inputs.
-            use_tqdm (bool): Whether to use tqdm for progress. Defaults to True.
-            save_results (bool): Whether to save results to disk. Defaults to True.
-            fail_on_parse_error (bool): Whether to raise an exception on parse errors.
-                Defaults to False.
-            batch_timeout (float): Timeout for the entire batch in seconds. Defaults to 300.0.
+            eval_inputs (List[EvalInput]): A list of evaluation inputs to process.
 
         Returns:
-            BatchResult: The result of the batch evaluation.
+            List[EvalOutput]: A list of evaluation outputs.
 
         Raises:
-            ValueError: If evaluation fails and fail_on_parse_error is True.
-            asyncio.TimeoutError: If the batch evaluation exceeds the specified timeout.
+            RuntimeError: If there are any errors during the evaluation process.
 
         Note:
-            This method processes the entire batch asynchronously. While this improves
-            throughput, it may lead to high memory usage for large batches. Monitor
-            system resources and consider processing in smaller sub-batches if necessary.
-            The batch_timeout applies to the entire batch, not individual requests.
+            This method processes inputs in batches and aggregates the results.
+            Any errors encountered during processing will be logged and raised
+            as a RuntimeError at the end of the evaluation.
         """
-        self._validate_inputs(eval_inputs)
-        prompts = [self._format_prompt(eval_input) for eval_input in eval_inputs]
-        request_messages = [
-            RequestMessage(id=str(i), content=prompt) for i, prompt in enumerate(prompts)
+        all_outputs = []
+        all_errors = []
+
+        for i in range(0, len(eval_inputs), self.adapter.batch_size):
+            batch = eval_inputs[i : i + self.adapter.batch_size]
+            batch_result = await self.adapter.process_batch(batch)
+            all_outputs.extend(batch_result.successful_outputs)
+            all_errors.extend(batch_result.errors)
+
+        if all_errors:
+            error_messages = [
+                f"Error for input {error.request_id}: {error.error_type} - {error.error_message}"
+                for error in all_errors
+            ]
+            raise RuntimeError(
+                f"Encountered {len(all_errors)} errors during evaluation:\n"
+                + "\n".join(error_messages)
+            )
+
+        return all_outputs
+
+    async def get_metrics(self) -> list[Metric]:
+        """Get metrics for the evaluation process.
+
+        Returns:
+            List[Metric]: A list of metrics about the evaluation process.
+
+        Note:
+            This method returns custom metrics related to the Baseten API usage.
+            Extend this method to include additional metrics as needed.
+        """
+        return [
+            CustomMetric(
+                name="baseten_api_calls",
+                value=self.adapter.rate_limiter.capacity - self.adapter.rate_limiter.tokens,
+                description="Number of Baseten API calls made during evaluation",
+            ),
+            CustomMetric(
+                name="baseten_rate_limit",
+                value=self.adapter.rate_limit,
+                description="Rate limit for Baseten API calls (requests per minute)",
+            ),
         ]
-
-        try:
-            batch_result = await asyncio.wait_for(
-                self.model._async_fetch_batched_response(request_messages), timeout=batch_timeout
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"Batch evaluation timed out after {batch_timeout} seconds")
-            return BatchResult(
-                successful_outputs=[],
-                errors=[
-                    FlowJudgeError(
-                        error_type="BatchTimeoutError",
-                        error_message=f"Batch evaluation timed out after {batch_timeout} seconds",
-                        request_id="batch",
-                    )
-                ],
-                total_requests=len(eval_inputs),
-                success_rate=0.0,
-            )
-
-        if save_results:
-            await asyncio.to_thread(
-                self._save_results, eval_inputs, batch_result.successful_outputs
-            )
-
-        if batch_result.errors:
-            logger.warning(
-                f"Number of errors: {len(batch_result.errors)} \
-                    out of {batch_result.total_requests}"
-            )
-            for error in batch_result.errors:
-                logger.error(
-                    f"Error in request {error.request_id}: \
-                        {error.error_type} - {error.error_message}"
-                )
-
-        if fail_on_parse_error and batch_result.errors:
-            raise ValueError(f"Evaluation failed for {len(batch_result.errors)} requests")
-
-        return batch_result

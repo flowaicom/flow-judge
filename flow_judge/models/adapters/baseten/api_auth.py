@@ -118,7 +118,6 @@ def _validate_entered_key(key: str) -> bool:
     :return: True if the key entered by the user is valid, False otherwise.
     :rtype: bool
     """
-
     try:
         logger.debug("Attempting to log in with provided API key")
         truss.login(key)

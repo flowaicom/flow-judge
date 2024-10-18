@@ -167,8 +167,7 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     async def _async_generate(self, prompt: str) -> str:
         if self.config.exec_async:
-            conversation = self._format_conversation(prompt)
-            return await self.api_adapter._async_fetch_response(conversation)
+            return await self.api_adapter._async_fetch_response(prompt.strip())
         else:
             logger.error("Attempting to run an async request with a synchronous API adapter")
 
@@ -176,8 +175,8 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
     ) -> Coroutine[Any, Any, list[str]]:
         if self.config.exec_async:
-            conversations = [self._format_conversation(prompt) for prompt in prompts]
-            return await self.api_adapter._async_fetch_batched_response(conversations)
+            cleaned_prompts = [prompt.strip() for prompt in prompts]
+            return await self.api_adapter._async_fetch_batched_response(cleaned_prompts)
         else:
             logger.error("Attempting to run an async request with a synchronous API adapter")
 

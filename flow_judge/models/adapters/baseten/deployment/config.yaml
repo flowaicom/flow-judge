@@ -80,18 +80,18 @@ model_metadata:
         \ Strictly adhere to the evaluation criteria and rubric."
       role: user
   openai_compatible: true
-  repo_id: flowaicom/Flow-Judge-v0.1-FP8
+  repo_id: flowaicom/Flow-Judge-v0.1-AWQ
   vllm_config:
     max_model_len: 8192
     tensor_parallel_size: 1
 model_name: Flow-Judge-v0.1
 python_version: py311
-repo_id: flowaicom/Flow-Judge-v0.1-FP8
+repo_id: flowaicom/Flow-Judge-v0.1-AWQ
 requirements:
 - vllm>=0.6.2
 - vllm-flash-attn
 resources:
-  accelerator: H100_40GB
+  accelerator: A10G
   use_gpu: true
 runtime:
   predict_concurrency: 128

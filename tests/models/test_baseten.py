@@ -473,7 +473,10 @@ def test_ensure_baseten_webhook_secret(
                 "To run Flow Judge remotely with Baseten and enable async execution"
                 in captured_output.getvalue()
             )
-            assert "Warning: The provided webhook secret is probably invalid." in captured_output.getvalue()
+            assert (
+                "Warning: The provided webhook secret is probably invalid."
+                in captured_output.getvalue()
+            )
         else:
             assert (
                 "Set the Baseten webhook secret in the BASETEN_WEBHOOK_SECRET"

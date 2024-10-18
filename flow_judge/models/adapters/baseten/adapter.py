@@ -1,209 +1,92 @@
 import os
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Union
 
 import aiohttp
-# import bleach
 import structlog
 from pydantic import BaseModel, Field, field_validator
-from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
-
-from flow_judge.eval_data_types import EvalInput, EvalOutput
+from openai import OpenAI, OpenAIError
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
+from flow_judge.models.adapters.base import BaseAPIAdapter
 from flow_judge.models.adapters.base import AsyncBaseAPIAdapter
-# from flow_judge.metrics import CustomMetric, Metric
+from flow_judge.models.adapters.baseten.token_bucket import TokenBucket
+from flow_judge.models.adapters.baseten.data_io import Message, BatchResult
+from flow_judge.models.adapters.baseten.management import set_scale_down_delay, wake_deployment, get_production_deployment_status
+from flow_judge.models.adapters.baseten.validation import validate_baseten_signature
+from flow_judge.models.adapters.baseten.errors import (
+    FlowJudgeError,
+    BasetenAPIError,
+    BasetenRequestError,
+    BasetenResponseError,
+    BasetenRateLimitError
+)
+
 
 logger = structlog.get_logger(__name__)
 
 
-class RequestMessage(TypedDict):
-    """Represents a single request message for the Baseten API.
+class BasetenAPIAdapter(BaseAPIAdapter):
+    """API utility class to execute sync requests from Baseten remote model hosting."""
 
-    Note:
-        This class uses TypedDict for strict type checking. Ensure all fields
-        are provided when instantiating. The 'id' field is crucial for tracking
-        and error reporting throughout the evaluation process.
+    def __init__(self, baseten_model_id: str):
+        """Initialize the BasetenAPIAdapter.
 
-    Warning:
-        Do not include sensitive information in the 'content' field, as it may
-        be logged or stored for debugging purposes.
-    """
-
-    id: str
-    index: int
-    content: str
-
-class ResponseMessage(TypedDict):
-    """Represents a single response message from the Webhook proxy.
-
-    Note:
-        This class uses TypedDict for strict type checking. Ensure all fields
-        are provided when instantiating. The 'id' field is crucial for tracking
-        and error reporting throughout the evaluation process.
-
-    Warning:
-        Do not include sensitive information in the 'content' field, as it may
-        be logged or stored for debugging purposes.
-    """
-
-    index: int
-    request_id: str
-    response: str
-
-
-class FlowJudgeError(BaseModel):
-    """Represents an error encountered during the Flow Judge evaluation process.
-
-    This class encapsulates detailed error information, including the type of error,
-    the specific message, the request ID that caused the error, and other metadata.
-
-    Attributes:
-        error_type (str): The type of error encountered (e.g., "TimeoutError").
-        error_message (str): A detailed description of the error.
-        request_id (str): The ID of the request that caused the error.
-        timestamp (datetime): The time when the error occurred.
-        retry_count (int): The number of retry attempts made before the error was raised.
-        raw_response (Optional[str]): The raw response from Baseten or proxy, if available.
-
-    Note:
-        This class is used for both logging and error handling. Ensure that sensitive
-        information is not included in the error_message or raw_response fields.
-    """
-
-    error_type: str = Field(..., description="Type of the error encountered")
-    error_message: str = Field(..., description="Detailed error message")
-    request_id: str = Field(..., description="ID of the request that caused the error")
-    timestamp: datetime = Field(
-        default_factory=datetime.now, description="Time when the error occurred"
-    )
-    retry_count: int = Field(default=0, description="Number of retry attempts made")
-    raw_response: str | None = Field(
-        None, description="Raw response from Baseten or proxy, if available"
-    )
-
-    @field_validator("error_type", "error_message", "request_id")
-    @classmethod
-    def check_non_empty_string(cls, v):
-        """Placeholder."""
-        if not v.strip():
-            raise ValueError("Field must not be empty or just whitespace")
-        return v
-
-
-class BatchResult(BaseModel):
-    """Represents the result of a batch evaluation process.
-
-    This class contains both successful outputs and errors encountered during the
-    evaluation process, as well as metadata about the batch operation.
-
-    Attributes:
-        successful_outputs (List[EvalOutput]): List of successful evaluation outputs.
-        errors (List[FlowJudgeError]): List of errors encountered during evaluation.
-        total_requests (int): Total number of requests processed in the batch.
-        success_rate (float): Rate of successful evaluations (0.0 to 1.0).
-
-    Note:
-        The success_rate is calculated as (len(successful_outputs) / total_requests).
-        Be cautious when interpreting results with a low success rate, as it may
-        indicate systemic issues with the evaluation process or input data.
-    """
-
-    successful_outputs: list[EvalOutput] = Field(
-        default_factory=list, description="List of successful evaluation outputs"
-    )
-    errors: list[FlowJudgeError] = Field(
-        default_factory=list, description="List of errors encountered during evaluation"
-    )
-    total_requests: int = Field(..., description="Total number of requests processed")
-    success_rate: float = Field(..., description="Rate of successful evaluations")
-
-    @field_validator("total_requests")
-    @classmethod
-    def check_positive_total_requests(cls, v):
-        """Placeholder."""
-        if v <= 0:
-            raise ValueError("total_requests must be positive")
-        return v
-
-    @field_validator("success_rate")
-    @classmethod
-    def check_success_rate_range(cls, v):
-        """Placeholder."""
-        if not 0 <= v <= 1:
-            raise ValueError("success_rate must be between 0 and 1")
-        return v
-
-
-class BasetenAPIError(Exception):
-    """Base exception for Baseten API errors."""
-
-    pass
-
-
-class BasetenRequestError(BasetenAPIError):
-    """Exception for request-related errors."""
-
-    pass
-
-
-class BasetenResponseError(BasetenAPIError):
-    """Exception for response-related errors."""
-
-    pass
-
-
-class BasetenRateLimitError(BasetenAPIError):
-    """Exception for rate limit errors."""
-
-    pass
-
-
-@dataclass
-class TokenBucket:
-    """Implements a token bucket algorithm for rate limiting.
-
-    This class manages a token bucket with a specified capacity and fill rate,
-    allowing for controlled consumption of tokens over time.
-
-    Attributes:
-        tokens (float): Current number of tokens in the bucket.
-        fill_rate (float): Rate at which tokens are added to the bucket (tokens per second).
-        capacity (float): Maximum number of tokens the bucket can hold.
-        last_update (float): Timestamp of the last token update.
-
-    Note:
-        This implementation is not thread-safe. If used in a multi-threaded environment,
-        external synchronization mechanisms should be applied.
-    """
-
-    tokens: float
-    fill_rate: float
-    capacity: float
-    last_update: float = field(default_factory=time.time)
-
-    def consume(self, tokens: int = 1) -> bool:
-        """Attempt to consume tokens from the bucket.
-
-        Args:
-            tokens (int): Number of tokens to consume. Defaults to 1.
-
-        Returns:
-            bool: True if tokens were successfully consumed, False otherwise.
-
-        Note:
-            This method updates the token count based on the time elapsed since
-            the last update, then attempts to consume the requested number of tokens.
+        :param baseten_model_id: The model_id designated for your deployment
+            - Can be found on your Baseten dashboard: https://app.baseten.co/models
+        :raises ValueError: if BASETEN_API_KEY environment variable is missing.
         """
-        now = time.time()
-        self.tokens = min(self.capacity, self.tokens + self.fill_rate * (now - self.last_update))
-        self.last_update = now
-        if self.tokens >= tokens:
-            self.tokens -= tokens
-            return True
-        return False
+        self.baseten_model_id = baseten_model_id
+
+        try:
+            self.baseten_api_key = os.environ["BASETEN_API_KEY"]
+        except KeyError as e:
+            raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
+
+        base_url = "https://bridge.baseten.co/v1/direct"
+        self.client = OpenAI(api_key=self.baseten_api_key, base_url=base_url)
+
+        super().__init__(base_url)
+
+    def _make_request(self, request_messages: dict[str, Any]) -> dict:
+        try:
+            completion = self.client.chat.completions.create(
+                messages=request_messages,
+                model="flowaicom/Flow-Judge-v0.1-AWQ",
+                extra_body={"baseten": {"model_id": self.baseten_model_id}},
+            )
+            return completion
+
+        except OpenAIError as e:
+            logger.warning(f"Model request failed: {e}")
+        except Exception as e:
+            logger.warning(f"An unexpected error occurred: {e}")
+
+    def _fetch_response(self, request_messages: dict[str, Any]) -> str:
+        completion = self._make_request(request_messages)
+
+        try:
+            message = completion.choices[0].message.content.strip()
+            return message
+        except Exception as e:
+            logger.warning(f"Failed to parse model response: {e}")
+            logger.warning("Returning default value")
+            return ""
+
+    def _fetch_batched_response(self, request_messages: list[dict[str, Any]]) -> list[str]:
+        outputs = []
+        for message in request_messages:
+            completion = self._make_request(message)
+        try:
+            outputs.append(completion.choices[0].message.content.strip())
+        except Exception as e:
+            logger.warning(f"Failed to parse model response: {e}")
+            logger.warning("Returning default value")
+            outputs.append("")
+        return outputs
 
 
 class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
@@ -232,7 +115,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         self,
         model_id: str,
         webhook_proxy_url: str,
-        batch_size: int,
+        batch_size: int = 128,
         max_retries: int = 1,
         request_timeout: float = 120.0,
         rate_limit: int = 20,
@@ -295,6 +178,32 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
+
+    async def _check_webhook_health(self) -> bool:
+        """Make an async health request to the webhook before executing generation tasks.
+
+        Returns:
+                bool: Health status, True if healthy, False otherwise
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.webhook_proxy_url}/health") as response:
+                    if response.status != 200:
+                        raise BasetenRequestError("Proxy seems in a unhealthy state."
+                            " Aborting Baseten requests."
+                        )
+                    return True
+
+        except aiohttp.ClientError as e:
+            raise BasetenRequestError(f"Network error while fetching token: {str(e)}") from e
+        except ConnectionError as e:
+            raise BasetenRequestError(
+                "Unable to connect to the webhook proxy."
+                " Make sure the correct URL is given."
+            ) from e
+
+
     async def _make_request(self, request_messages: list[dict[str, Any]]) -> str:
         """Make an asynchronous request to the Baseten model.
 
@@ -331,14 +240,18 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     elif response.status >= 400:
                         raise BasetenRequestError(f"Request failed with status {response.status}")
                     resp_json = await response.json()
+
                     if "request_id" not in resp_json:
                         raise BasetenResponseError("Invalid response from Baseten")
+
                     return resp_json["request_id"]
+
         except aiohttp.ClientError as e:
             raise BasetenRequestError(f"Network error: {str(e)}") from e
         except json.JSONDecodeError as e:
             raise BasetenResponseError(f"Invalid JSON response: {str(e)}") from e
-        
+
+
     async def _get_stream_token(self, request_id: str) -> str | None:
         """Retrieve the stream token for a given request ID.
 
@@ -371,6 +284,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             raise BasetenRequestError(f"Network error while fetching token: {str(e)}") from e
         except json.JSONDecodeError as e:
             raise BasetenResponseError(f"Invalid JSON response for token: {str(e)}") from e
+
 
     async def _fetch_stream(self, request_id: str) -> str:
         """Fetch and process the stream from the webhook proxy.
@@ -415,36 +329,36 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         resp = json.loads(split_chunks[1])
 
                         message = resp["data"]["choices"][0]["message"]["content"].strip()
-                        # FIXME: signature is not used yet
-                        signature = split_chunks[2].replace("\n\n","")
-                        # signature = resp.get("signature", "")
-                        logger.debug(f"signature: {signature} for request {request_id}")
+                        signature = split_chunks[2].replace("\n\n","").split("signature=")[1]
 
                     except (json.JSONDecodeError, KeyError, IndexError) as e:
                         logger.warning(f"Failed to parse chunk: {e}")
-                        continue
+                        raise BasetenResponseError(
+                            f"Invalid JSON response: {str(e)}"
+                        ) from e
+                    
                     if "data: eot" in decoded_chunk:
                         break
 
                 if not message:
                     raise ValueError("Empty response from stream")
 
-                # Validate the signature here if needed
-                # if not validate_baseten_signature(message, signature):
-                #     raise ValueError("Invalid Baseten signature")
+                # Validate the webhook signature
+                if not validate_baseten_signature(resp, signature):
+                    raise ValueError("Invalid Baseten signature")
 
                 return message
 
     async def _process_request_with_retry(
-        self, message: RequestMessage
-    ) -> EvalOutput | FlowJudgeError:
+        self, message: Message
+    ) -> Message | FlowJudgeError:
         """Process a single request message with retry and exponential backoff.
 
         Args:
-            message (RequestMessage): The request message to process.
+            message (Message): The request message to process.
 
         Returns:
-            Union[EvalOutput, FlowJudgeError]: The processed output or an error object.
+            Union[Message, FlowJudgeError]: The processed output or an error object.
 
         Note:
             This method implements a retry mechanism with exponential backoff.
@@ -452,13 +366,16 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             before giving up and returning a FlowJudgeError.
         """
         @retry(
+            retry=retry_if_exception_type(BasetenAPIError),
             stop=stop_after_attempt(self.max_retries),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
             wait=wait_exponential(min=self.retry_min_wait, max=self.retry_max_wait),
             reraise=True,
         )
         async def _attempt_request():
             async with self.semaphore:
-                message_body = {"role": "user", "content": message["content"]}
+                message_body = {"role": "user", "content": message["prompt"]}
+
                 request_id = await self._make_request([message_body])
 
                 logger.debug(f"Requested baseten, request_id: {request_id}")
@@ -468,13 +385,11 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
                 return await self._fetch_stream(request_id)
 
+
         try:
             response = await _attempt_request()
-            return ResponseMessage(
-                request_id=message["id"],
-                response=response,
-                index=message["index"]
-                )
+            message["response"] = response
+            return message
         except RetryError as e:
             return FlowJudgeError(
                 error_type="RetryError",
@@ -489,15 +404,105 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                 request_id=message["id"],
             )
         
-    # TODO: Implement - runtime raises error for abstract method
-    async def _async_fetch_response(self, message: str) -> str:
-        pass
+    async def _is_model_awake(self) -> bool:
+        """Wake the deployed model.
+
+        :returns: True if successfully awake or pinging has a soft failure.
+        False if the model status is indicating 'failure'.
+
+        Note: Baseten does not wait for the model to wake up.
+        Hence the additional pinging for the model status.
+        We use the model information API from the Management endpoints
+        to get information of the model status and keep pinging every 10secs
+        when status is in a 'transitionary' phase.
+        """
+        # Initial check to see if the model is already active.
+        status = await get_production_deployment_status(self.model_id, self.baseten_api_key)
+        if status == "ACTIVE":
+            return
+        
+        has_triggered_correctly = await wake_deployment(self.model_id, self.baseten_api_key)
+        if not has_triggered_correctly:
+            raise BasetenAPIError("Trigger to wake the deployed model failed.")
+
+        TIMEOUT_SECONDS = 300
+
+        # Wait for the initial trigger to switch deployment status
+        await asyncio.sleep(3)
+
+        async def has_model_activated(start_time: Union[float, int]):
+            status = await get_production_deployment_status(self.model_id, self.baseten_api_key)
+            if status is None:
+                logger.warning(
+                    "Unable to detect if model is awake. "
+                    "Continuing anyway."
+                )
+                return True
+            if status in ["BUILDING", "DEPLOYING", "LOADING_MODEL", "WAKING_UP", "UPDATING"]:
+                logger.info("The deployed model is waking up.")
+
+                if time.time() - start_time >= TIMEOUT_SECONDS:
+                    raise BasetenAPIError("Model took too long to wake up. Stopping execution.")
+                
+                await asyncio.sleep(10)
+                return await has_model_activated(start_time)
+            
+            if status in ["BUILD_FAILED", "BUILD_STOPPED", "FAILED", "UNHEALTHY"]:
+                raise BasetenAPIError("Model seems to be in an unhealthy state. Stopping execution.")
+
+            if status in ["ACTIVE"]:
+                logger.info("The deployed model is active.")
+                return True
+            
+        if not await has_model_activated(time.time()):
+            raise BasetenAPIError("Unable to wake up the model.")
+        
+    
+    async def _initialize_state_for_request(self, scale_down_delay: int) -> None:
+        """Pre-steps for a single/batched request
+        
+        :param scale_down_delay: The delay in seconds to scale down the model.
+        
+        Note: 
+            Activates the model by sendng a "wake-up" request and waits for
+            the model to wake-up. Updates the scale-down delay value, defaults to
+            120secs for a single request, and 30secs for batched requests.
+        
+        Raises:
+            BasetenAPIError for when we are unable to activate the model.
+        """
+        await self._is_model_awake()
+
+        # Update scale down delay to 30secs for batched requests.
+        is_scaled_down = await set_scale_down_delay(
+            scale_down_delay=30,
+            api_key=self.baseten_api_key,
+            model_id=self.model_id
+        )
+        if not is_scaled_down:
+            logger.warning("Unable to reduce scale down delay. Continuing with default.")
+        
+
+    async def _async_fetch_response(self, prompt: str) -> Message | FlowJudgeError:
+        # Attempt to initialize the model state.
+        try:
+            await self._check_webhook_health()
+            await self._initialize_state_for_request(scale_down_delay=120)
+        except BasetenAPIError as e:
+            return FlowJudgeError(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    request_id=None
+                )
+        
+        return await self._process_request_with_retry(Message(prompt=prompt, index=1, id=None, response=None))
+        
 
     async def _async_fetch_batched_response(self, prompts: list[str]) -> BatchResult:
         """Process a batch of evaluation inputs asynchronously.
 
         Args:
-            batch (List[EvalInput]): A list of evaluation inputs to process.
+            batch (List[str]): A list of prompts to process.
 
         Returns:
             BatchResult: An object containing successful outputs and errors.
@@ -506,24 +511,54 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             This method processes each input in the batch concurrently, up to
             the rate limit. It aggregates results and errors into a BatchResult.
         """
-        indexed_prompts = [RequestMessage(index=i+1, content=prompt, id=None) for i, prompt in enumerate(prompts)]
+        indexed_prompts = [
+            Message(index=i+1, prompt=prompt, id=None, response="") for i, prompt in enumerate(prompts)
+        ]
+
         all_results = []
+
+       # Attempt to initialize the model state.
+        try:
+            await self._initialize_state_for_request(scale_down_delay=30)
+        except BasetenAPIError as e:
+            return BatchResult(
+                successful_outputs=[],
+                errors=[FlowJudgeError(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    request_id=None
+                )],
+                success_rate=0,
+                total_requests=0
+            )        
+
         for i in range(0, len(indexed_prompts), self.batch_size):
+            
+            try:
+                await self._check_webhook_health()
+            except BasetenAPIError as e:
+                all_results.append(FlowJudgeError(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    request_id=None,
+                ))
+                break
+
             batch = indexed_prompts[i : i + self.batch_size]
             logger.debug(f"Batch {i}: {batch}")
             tasks = [
                 self._process_request_with_retry(request_message)
                 for request_message in batch
             ]
+
             results = await asyncio.gather(*tasks)
             all_results.append(results)
 
-        return all_results
-
         successful_outputs = []
         errors = []
+
         for result in results:
-            if isinstance(result, EvalOutput):
+            if isinstance(result, dict) and all(key in result for key in Message.__annotations__):
                 successful_outputs.append(result)
             elif isinstance(result, FlowJudgeError):
                 errors.append(result)
@@ -537,99 +572,3 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             total_requests=total_requests,
             success_rate=success_rate,
         )
-
-
-# class BasetenFlowJudge(BaseFlowJudge):
-#     """Flow Judge implementation using the Baseten API.
-
-#     This class extends BaseFlowJudge to provide evaluation functionality
-#     using the Baseten API for model inference.
-
-#     Attributes:
-#         adapter (AsyncBasetenAPIAdapter): The adapter for making API calls to Baseten.
-
-#     Note:
-#         This implementation assumes that the Baseten model is configured to
-#         handle the specific evaluation task. Ensure that the model input and
-#         output formats match the expectations of this class.
-#     """
-
-#     def __init__(
-#         self,
-#         model_id: str,
-#         webhook_proxy_url: str,
-#         batch_size: int,
-#         max_retries: int = 3,
-#         request_timeout: float = 30.0,
-#         rate_limit: int = 20,
-#         retry_min_wait: float = 1.0,
-#         retry_max_wait: float = 60.0,
-#     ):
-#         """Initialize the BasetenFlowJudge.
-
-#         Args:
-#             model_id (str): The ID of the Baseten model to use for evaluation.
-#             webhook_proxy_url (str): The URL of the webhook proxy for async requests.
-#             batch_size (int): The number of inputs to process in each batch.
-#             max_retries (int): Maximum number of retry attempts for failed requests.
-#             request_timeout (float): Timeout for individual requests in seconds.
-#             rate_limit (int): Maximum number of requests per minute.
-#             retry_min_wait (float): Minimum wait time between retries in seconds.
-#             retry_max_wait (float): Maximum wait time between retries in seconds.
-
-#         Raises:
-#             ValueError: If any of the input parameters are invalid.
-
-#         Note:
-#             The retry and rate limiting parameters should be tuned based on
-#             the specific characteristics of your Baseten model and use case.
-#         """
-#         super().__init__()
-#         self.adapter = AsyncBasetenAPIAdapter(
-#             model_id,
-#             webhook_proxy_url,
-#             batch_size,
-#             max_retries,
-#             request_timeout,
-#             rate_limit,
-#             retry_min_wait,
-#             retry_max_wait,
-#         )
-
-#     async def evaluate(self, eval_inputs: list[EvalInput]) -> list[EvalOutput]:
-#         """Evaluate a list of inputs using the Baseten model.
-
-#         Args:
-#             eval_inputs (List[EvalInput]): A list of evaluation inputs to process.
-
-#         Returns:
-#             List[EvalOutput]: A list of evaluation outputs.
-
-#         Raises:
-#             RuntimeError: If there are any errors during the evaluation process.
-
-#         Note:
-#             This method processes inputs in batches and aggregates the results.
-#             Any errors encountered during processing will be logged and raised
-#             as a RuntimeError at the end of the evaluation.
-#         """
-#         all_outputs = []
-#         all_errors = []
-
-#         for i in range(0, len(eval_inputs), self.adapter.batch_size):
-#             batch = eval_inputs[i : i + self.adapter.batch_size]
-#             batch_result = await self.adapter.process_batch(batch)
-#             all_outputs.extend(batch_result.successful_outputs)
-#             all_errors.extend(batch_result.errors)
-
-#         if all_errors:
-#             error_messages = [
-#                 f"Error for input {error.request_id}: {error.error_type} - {error.error_message}"
-#                 for error in all_errors
-#             ]
-#             raise RuntimeError(
-#                 f"Encountered {len(all_errors)} errors during evaluation:\n"
-#                 + "\n".join(error_messages)
-#             )
-
-#         return all_outputs

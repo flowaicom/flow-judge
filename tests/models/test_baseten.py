@@ -46,7 +46,7 @@ def test_ensure_model_deployment_key_exists(
 
     with caplog.at_level(logging.INFO):
         with patch(
-            "flow_judge.models.adapters.baseten.deploy._validate_auth_status", return_value=True
+            "flow_judge.models.adapters.baseten.api_auth._validate_auth_status", return_value=True
         ):
             with patch(
                 "flow_judge.models.adapters.baseten.deploy._initialize_model", return_value=True
@@ -77,10 +77,10 @@ def test_ensure_model_deployment_key_missing_non_interactive(
 
     with caplog.at_level(logging.INFO):
         with patch(
-            "flow_judge.models.adapters.baseten.deploy._validate_auth_status", return_value=False
+            "flow_judge.models.adapters.baseten.api_auth._validate_auth_status", return_value=False
         ):
             with patch(
-                "flow_judge.models.adapters.baseten.deploy._is_interactive", return_value=False
+                "flow_judge.models.adapters.baseten.util.is_interactive", return_value=False
             ):
                 result = ensure_model_deployment()
 
@@ -114,18 +114,18 @@ def test_ensure_model_deployment_key_missing_interactive(
 
     with caplog.at_level(logging.INFO):
         with patch(
-            "flow_judge.models.adapters.baseten.deploy._validate_auth_status",
+            "flow_judge.models.adapters.baseten.api_auth._validate_auth_status",
             side_effect=[False, True],
         ):
             with patch(
-                "flow_judge.models.adapters.baseten.deploy._is_interactive", return_value=True
+                "flow_judge.models.adapters.baseten.api_auth.is_interactive", return_value=True
             ):
                 with patch(
-                    "flow_judge.models.adapters.baseten.deploy.getpass.getpass",
+                    "flow_judge.models.adapters.baseten.api_auth.getpass.getpass",
                     return_value="mock_api_key",
                 ):
                     with patch(
-                        "flow_judge.models.adapters.baseten.deploy.truss.login"
+                        "flow_judge.models.adapters.baseten.api_auth.truss.login"
                     ) as mock_login:
                         with patch(
                             "flow_judge.models.adapters.baseten.deploy._initialize_model",
@@ -453,7 +453,7 @@ def test_ensure_baseten_webhook_secret(
             "flow_judge.models.adapters.baseten.webhook._get_stored_secret"
         ) as mock_get_stored:
             with patch(
-                "flow_judge.models.adapters.baseten.webhook._is_interactive"
+                "flow_judge.models.adapters.baseten.webhook.is_interactive"
             ) as mock_interactive:
                 with patch("getpass.getpass", return_value="whsec_valid"):
                     with patch("flow_judge.models.adapters.baseten.webhook._save_webhook_secret"):
@@ -473,7 +473,7 @@ def test_ensure_baseten_webhook_secret(
                 "To run Flow Judge remotely with Baseten and enable async execution"
                 in captured_output.getvalue()
             )
-            assert "Warning: Invalid webhook secret" in captured_output.getvalue()
+            assert "Warning: The provided webhook secret is probably invalid." in captured_output.getvalue()
         else:
             assert (
                 "Set the Baseten webhook secret in the BASETEN_WEBHOOK_SECRET"

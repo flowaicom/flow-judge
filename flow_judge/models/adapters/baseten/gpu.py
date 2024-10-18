@@ -5,6 +5,8 @@ from typing import Any
 
 import yaml
 
+from .util import is_interactive
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,17 +15,6 @@ class ModelByGPU(Enum):
 
     H100_40GB = "flowaicom/Flow-Judge-v0.1-FP8"
     A10G = "flowaicom/Flow-Judge-v0.1-AWQ"
-
-
-def _is_interactive() -> bool:
-    """Check if the current environment is interactive.
-
-    :return: True if the environment is interactive, False otherwise.
-    :rtype: bool
-    """
-    import sys
-
-    return sys.__stdin__.isatty()
 
 
 def _get_gpu_key() -> str | None:
@@ -102,7 +93,7 @@ def ensure_gpu() -> bool:
     if _has_gpu_key():
         return _update_config()
 
-    if _is_interactive():
+    if is_interactive():
         print("What GPU on Baseten should we deploy the FlowJudge model to?")
         print(" ➡️ H100")
         print(" ➡️ A10G: default")
@@ -134,7 +125,7 @@ def ensure_gpu() -> bool:
             continue
 
         if upgrade.lower() in ["yes", "y"]:
-            os.environ["BASETEN_GPU"] = ModelByGPU.H100.name
+            os.environ["BASETEN_GPU"] = ModelByGPU.H100_40GB.name
             return _update_config()
 
         if upgrade.lower() in ["n", "no"]:

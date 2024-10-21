@@ -3,12 +3,10 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, TypedDict, Union
+from typing import Any, Union
 
 import aiohttp
 import structlog
-from pydantic import BaseModel, Field, field_validator
 from openai import OpenAI, OpenAIError
 from tenacity import RetryError, retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
 from flow_judge.models.adapters.base import BaseAPIAdapter
@@ -495,8 +493,19 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                     request_id=None
                 )
         
-        return await self._process_request_with_retry(Message(prompt=prompt, index=1, id=None, response=None))
+        result = await self._process_request_with_retry(
+            Message(
+                prompt=prompt,
+                index=1,
+                id=None,
+                response=None
+            ))
         
+        if isinstance(result, FlowJudgeError):
+            return result
+        
+        return result["response"]
+
 
     async def _async_fetch_batched_response(self, prompts: list[str]) -> BatchResult:
         """Process a batch of evaluation inputs asynchronously.
@@ -552,18 +561,21 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             ]
 
             results = await asyncio.gather(*tasks)
-            all_results.append(results)
+            all_results.extend(results)
 
         successful_outputs = []
         errors = []
 
-        for result in results:
-            if isinstance(result, dict) and all(key in result for key in Message.__annotations__):
+        for result in all_results:
+            if isinstance(result, dict) and all(
+                key in list(Message.__annotations__.keys()) for key, _ in result.items()
+            ):
                 successful_outputs.append(result)
             elif isinstance(result, FlowJudgeError):
                 errors.append(result)
 
-        total_requests = len(batch)
+        successful_outputs = sorted(successful_outputs, key=lambda o: o["index"])
+        total_requests = len(successful_outputs) + len(errors)
         success_rate = len(successful_outputs) / total_requests if total_requests > 0 else 0
 
         return BatchResult(

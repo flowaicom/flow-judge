@@ -361,18 +361,19 @@ async def test_baseten_init_valid(
 
         # Test asynchronous initialization without webhook secret
         monkeypatch.delenv("BASETEN_WEBHOOK_SECRET", raising=False)
-        with patch(
-            "flow_judge.models.adapters.baseten.webhook.ensure_baseten_webhook_secret",
-            return_value=False,
+        with pytest.raises(
+            BasetenError,
+            match=(
+                "Unable to retrieve Baseten's webhook secret. "
+                "Please ensure the webhook secret is provided in "
+                "BASETEN_WEBHOOK_SECRET environment variable."
+            ),
         ):
-            with pytest.raises(
-                ValueError, match="BASETEN_WEBHOOK_SECRET is not provided in the environment."
-            ):
-                Baseten(
-                    exec_async=True,
-                    async_batch_size=256,
-                    webhook_proxy_url="https://example.com/webhook",
-                )
+            Baseten(
+                exec_async=True,
+                async_batch_size=256,
+                webhook_proxy_url="https://example.com/webhook",
+            )
 
     # Test error cases
     with pytest.raises(

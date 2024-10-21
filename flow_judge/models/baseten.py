@@ -5,6 +5,7 @@ from typing import Any
 from .adapters.baseten.adapter import AsyncBasetenAPIAdapter, BaseAPIAdapter, BasetenAPIAdapter
 from .adapters.baseten.data_io import BatchResult
 from .adapters.baseten.deploy import ensure_model_deployment, get_deployed_model_id
+from .adapters.baseten.webhook import ensure_baseten_webhook_secret
 from .common import (
     AsyncBaseFlowJudgeModel,
     BaseFlowJudgeModel,
@@ -120,6 +121,16 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
                             "Please ensure the model is deployed or provide a custom '_model_id'."
                         ),
                     )
+
+        if exec_async and not ensure_baseten_webhook_secret():
+            raise BasetenError(
+                status_code=4,
+                message=(
+                    "Unable to retrieve Baseten's webhook secret. "
+                    "Please ensure the webhook secret is provided in "
+                    "BASETEN_WEBHOOK_SECRET environment variable."
+                ),
+            )
 
         if api_adapter is not None and not isinstance(
             api_adapter, (BasetenAPIAdapter, AsyncBasetenAPIAdapter)

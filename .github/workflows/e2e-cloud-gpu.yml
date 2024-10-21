@@ -2,6 +2,10 @@ name: E2E Test (cloud engines, GPU enabled)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
 

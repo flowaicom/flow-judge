@@ -51,13 +51,13 @@ async def set_scale_down_delay(
     except aiohttp.ClientError as e:
         logger.warning(
             "Network error with Baseten scale_down_delay"
-            f"{e}"
+            f" {e}"
         )
         return False
     except Exception as e:
         logger.error(
             "Unexpected error occurred with Baseten scale down delay request"
-            f"{e}"
+            f" {e}"
         )
         return False
     
@@ -87,13 +87,13 @@ async def wake_deployment(model_id: str, api_key: str) -> bool:
     except aiohttp.ClientError as e:
         logger.warning(
             "Network error with Baseten model activation."
-            f"{e}"
+            f" {e}"
         )
         return False
     except Exception as e:
         logger.error(
             "Unexpected error occurred with Baseten model activation."
-            f"{e}"
+            f" {e}"
         )
         return False
     
@@ -122,18 +122,18 @@ async def get_production_deployment_status(model_id: str, api_key: str) -> str |
     except (json.JSONDecodeError, KeyError, IndexError) as e:
         logger.warning(
             "Unable to parse response for Model deployment info request."
-            f"{e}"
+            f" {e}"
         )
         return None      
     except aiohttp.ClientError as e:
         logger.warning(
             "Network error with Baseten model deployment information."
-            f"{e}"
+            f" {e}"
         )
         return None
     except Exception as e:
         logger.error(
             "Unexpected error occurred with Baseten model deployment info request."
-            f"{e}"
+            f" {e}"
         )
         return None

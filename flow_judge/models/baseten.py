@@ -3,6 +3,7 @@ from collections.abc import Coroutine
 from typing import Any
 
 from .adapters.baseten.adapter import AsyncBasetenAPIAdapter, BaseAPIAdapter, BasetenAPIAdapter
+from .adapters.baseten.data_io import BatchResult
 from .adapters.baseten.deploy import ensure_model_deployment, get_deployed_model_id
 from .common import (
     AsyncBaseFlowJudgeModel,
@@ -173,7 +174,7 @@ class Baseten(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
     async def _async_batch_generate(
         self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any
-    ) -> Coroutine[Any, Any, list[str]]:
+    ) -> Coroutine[Any, Any, BatchResult]:
         if self.config.exec_async:
             cleaned_prompts = [prompt.strip() for prompt in prompts]
             return await self.api_adapter._async_fetch_batched_response(cleaned_prompts)

@@ -8,6 +8,7 @@ import requests
 import truss
 from truss.remote import remote_factory
 from truss.remote.baseten.error import ApiError
+
 from flow_judge.models.adapters.baseten.management import set_scale_down_delay
 
 from .gpu import ensure_gpu
@@ -65,7 +66,10 @@ def _initialize_model() -> bool:
         if has_updated_scale_down:
             logger.info("Successfully updated Baseten deployed model scale down delay to 2 mins.")
         else:
-            logger.info("Unable to update Baseten deployed model scale down delay period. Continuing with default")
+            logger.info(
+                "Unable to update Baseten deployed model scale down delay period."
+                " Continuing with default"
+            )
         return True
     except ApiError as e:
         logger.error(

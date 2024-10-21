@@ -1,28 +1,38 @@
-import os
 import asyncio
 import json
 import logging
+import os
 import time
-from typing import Any, Union
+from typing import Any
 
 import aiohttp
 import structlog
 from openai import OpenAI, OpenAIError
-from tenacity import RetryError, retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
-from flow_judge.models.adapters.base import BaseAPIAdapter
-from flow_judge.models.adapters.base import AsyncBaseAPIAdapter
-from flow_judge.models.adapters.baseten.token_bucket import TokenBucket
-from flow_judge.models.adapters.baseten.data_io import Message, BatchResult
-from flow_judge.models.adapters.baseten.management import set_scale_down_delay, wake_deployment, get_production_deployment_status
-from flow_judge.models.adapters.baseten.validation import validate_baseten_signature
-from flow_judge.models.adapters.baseten.errors import (
-    FlowJudgeError,
-    BasetenAPIError,
-    BasetenRequestError,
-    BasetenResponseError,
-    BasetenRateLimitError
+from tenacity import (
+    RetryError,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
 )
 
+from flow_judge.models.adapters.base import AsyncBaseAPIAdapter, BaseAPIAdapter
+from flow_judge.models.adapters.baseten.data_io import BatchResult, Message
+from flow_judge.models.adapters.baseten.errors import (
+    BasetenAPIError,
+    BasetenRateLimitError,
+    BasetenRequestError,
+    BasetenResponseError,
+    FlowJudgeError,
+)
+from flow_judge.models.adapters.baseten.management import (
+    get_production_deployment_status,
+    set_scale_down_delay,
+    wake_deployment,
+)
+from flow_judge.models.adapters.baseten.token_bucket import TokenBucket
+from flow_judge.models.adapters.baseten.validation import validate_baseten_signature
 
 logger = structlog.get_logger(__name__)
 
@@ -176,7 +186,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except KeyError as e:
             raise ValueError("BASETEN_API_KEY is not provided in the environment.") from e
 
-
     async def _check_webhook_health(self) -> bool:
         """Make an async health request to the webhook before executing generation tasks.
 
@@ -185,11 +194,10 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self.webhook_proxy_url}/health") as response:
+                async with session.get(f"{self.webhook_proxy_url}/health") as response:
                     if response.status != 200:
-                        raise BasetenRequestError("Proxy seems in a unhealthy state."
-                            " Aborting Baseten requests."
+                        raise BasetenRequestError(
+                            "Proxy seems in a unhealthy state." " Aborting Baseten requests."
                         )
                     return True
 
@@ -197,10 +205,8 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             raise BasetenRequestError(f"Network error while fetching token: {str(e)}") from e
         except ConnectionError as e:
             raise BasetenRequestError(
-                "Unable to connect to the webhook proxy."
-                " Make sure the correct URL is given."
+                "Unable to connect to the webhook proxy." " Make sure the correct URL is given."
             ) from e
-
 
     async def _make_request(self, request_messages: list[dict[str, Any]]) -> str:
         """Make an asynchronous request to the Baseten model.
@@ -249,7 +255,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         except json.JSONDecodeError as e:
             raise BasetenResponseError(f"Invalid JSON response: {str(e)}") from e
 
-
     async def _get_stream_token(self, request_id: str) -> str | None:
         """Retrieve the stream token for a given request ID.
 
@@ -282,7 +287,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             raise BasetenRequestError(f"Network error while fetching token: {str(e)}") from e
         except json.JSONDecodeError as e:
             raise BasetenResponseError(f"Invalid JSON response for token: {str(e)}") from e
-
 
     async def _fetch_stream(self, request_id: str) -> str:
         """Fetch and process the stream from the webhook proxy.
@@ -327,14 +331,12 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         resp = json.loads(split_chunks[1])
 
                         message = resp["data"]["choices"][0]["message"]["content"].strip()
-                        signature = split_chunks[2].replace("\n\n","").split("signature=")[1]
+                        signature = split_chunks[2].replace("\n\n", "").split("signature=")[1]
 
                     except (json.JSONDecodeError, KeyError, IndexError) as e:
                         logger.warning(f"Failed to parse chunk: {e}")
-                        raise BasetenResponseError(
-                            f"Invalid JSON response: {str(e)}"
-                        ) from e
-                    
+                        raise BasetenResponseError(f"Invalid JSON response: {str(e)}") from e
+
                     if "data: eot" in decoded_chunk:
                         break
 
@@ -347,9 +349,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
                 return message
 
-    async def _process_request_with_retry(
-        self, message: Message
-    ) -> Message | FlowJudgeError:
+    async def _process_request_with_retry(self, message: Message) -> Message | FlowJudgeError:
         """Process a single request message with retry and exponential backoff.
 
         Args:
@@ -363,6 +363,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             It will attempt to process the request up to self.max_retries times
             before giving up and returning a FlowJudgeError.
         """
+
         @retry(
             retry=retry_if_exception_type(BasetenAPIError),
             stop=stop_after_attempt(self.max_retries),
@@ -383,7 +384,6 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
                 return await self._fetch_stream(request_id)
 
-
         try:
             response = await _attempt_request()
             message["response"] = response
@@ -401,7 +401,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                 error_message=str(e),
                 request_id=message["id"],
             )
-        
+
     async def _is_model_awake(self) -> bool:
         """Wake the deployed model.
 
@@ -418,54 +418,52 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
         status = await get_production_deployment_status(self.model_id, self.baseten_api_key)
         if status == "ACTIVE":
             return
-        
+
         has_triggered_correctly = await wake_deployment(self.model_id, self.baseten_api_key)
         if not has_triggered_correctly:
             raise BasetenAPIError("Trigger to wake the deployed model failed.")
 
-        TIMEOUT_SECONDS = 300
+        timeout_seconds = 300
 
         # Wait for the initial trigger to switch deployment status
         await asyncio.sleep(3)
 
-        async def has_model_activated(start_time: Union[float, int]):
+        async def has_model_activated(start_time: float | int):
             status = await get_production_deployment_status(self.model_id, self.baseten_api_key)
             if status is None:
-                logger.warning(
-                    "Unable to detect if model is awake. "
-                    "Continuing anyway."
-                )
+                logger.warning("Unable to detect if model is awake. " "Continuing anyway.")
                 return True
             if status in ["BUILDING", "DEPLOYING", "LOADING_MODEL", "WAKING_UP", "UPDATING"]:
                 logger.info("The deployed model is waking up.")
 
-                if time.time() - start_time >= TIMEOUT_SECONDS:
+                if time.time() - start_time >= timeout_seconds:
                     raise BasetenAPIError("Model took too long to wake up. Stopping execution.")
-                
+
                 await asyncio.sleep(10)
                 return await has_model_activated(start_time)
-            
+
             if status in ["BUILD_FAILED", "BUILD_STOPPED", "FAILED", "UNHEALTHY"]:
-                raise BasetenAPIError("Model seems to be in an unhealthy state. Stopping execution.")
+                raise BasetenAPIError(
+                    "Model seems to be in an unhealthy state. Stopping execution."
+                )
 
             if status in ["ACTIVE"]:
                 logger.info("The deployed model is active.")
                 return True
-            
+
         if not await has_model_activated(time.time()):
             raise BasetenAPIError("Unable to wake up the model.")
-        
-    
+
     async def _initialize_state_for_request(self, scale_down_delay: int) -> None:
-        """Pre-steps for a single/batched request
-        
+        """Pre-steps for a single/batched request.
+
         :param scale_down_delay: The delay in seconds to scale down the model.
-        
-        Note: 
+
+        Note:
             Activates the model by sendng a "wake-up" request and waits for
             the model to wake-up. Updates the scale-down delay value, defaults to
             120secs for a single request, and 30secs for batched requests.
-        
+
         Raises:
             BasetenAPIError for when we are unable to activate the model.
         """
@@ -473,45 +471,44 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
 
         # Update scale down delay to 30secs for batched requests.
         is_scaled_down = await set_scale_down_delay(
-            scale_down_delay=30,
-            api_key=self.baseten_api_key,
-            model_id=self.model_id
+            scale_down_delay=30, api_key=self.baseten_api_key, model_id=self.model_id
         )
         if not is_scaled_down:
             logger.warning("Unable to reduce scale down delay. Continuing with default.")
-        
 
     async def _async_fetch_response(self, prompt: str) -> Message | FlowJudgeError:
+        """Single async request to Baseten.
+
+        Args:
+            prompt: Prompt string for the request.
+
+        Returns:
+            A message dictionary or an error.
+            (Message | FlowJudgeError)
+        """
         # Attempt to initialize the model state.
         try:
             await self._check_webhook_health()
             await self._initialize_state_for_request(scale_down_delay=120)
         except BasetenAPIError as e:
             return FlowJudgeError(
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    request_id=None
-                )
-        
+                error_type=type(e).__name__, error_message=str(e), request_id=None
+            )
+
         result = await self._process_request_with_retry(
-            Message(
-                prompt=prompt,
-                index=1,
-                id=None,
-                response=None
-            ))
-        
+            Message(prompt=prompt, index=1, id=None, response=None)
+        )
+
         if isinstance(result, FlowJudgeError):
             return result
-        
-        return result["response"]
 
+        return result["response"]
 
     async def _async_fetch_batched_response(self, prompts: list[str]) -> BatchResult:
         """Process a batch of evaluation inputs asynchronously.
 
         Args:
-            batch (List[str]): A list of prompts to process.
+            prompts (List[str]): A list of prompts to process.
 
         Returns:
             BatchResult: An object containing successful outputs and errors.
@@ -521,44 +518,43 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
             the rate limit. It aggregates results and errors into a BatchResult.
         """
         indexed_prompts = [
-            Message(index=i+1, prompt=prompt, id=None, response="") for i, prompt in enumerate(prompts)
+            Message(index=i + 1, prompt=prompt, id=None, response="")
+            for i, prompt in enumerate(prompts)
         ]
 
         all_results = []
 
-       # Attempt to initialize the model state.
+        # Attempt to initialize the model state.
         try:
             await self._initialize_state_for_request(scale_down_delay=30)
         except BasetenAPIError as e:
             return BatchResult(
                 successful_outputs=[],
-                errors=[FlowJudgeError(
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    request_id=None
-                )],
+                errors=[
+                    FlowJudgeError(
+                        error_type=type(e).__name__, error_message=str(e), request_id=None
+                    )
+                ],
                 success_rate=0,
-                total_requests=0
-            )        
+                total_requests=0,
+            )
 
         for i in range(0, len(indexed_prompts), self.batch_size):
-            
             try:
                 await self._check_webhook_health()
             except BasetenAPIError as e:
-                all_results.append(FlowJudgeError(
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    request_id=None,
-                ))
+                all_results.append(
+                    FlowJudgeError(
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        request_id=None,
+                    )
+                )
                 break
 
             batch = indexed_prompts[i : i + self.batch_size]
             logger.debug(f"Batch {i}: {batch}")
-            tasks = [
-                self._process_request_with_retry(request_message)
-                for request_message in batch
-            ]
+            tasks = [self._process_request_with_retry(request_message) for request_message in batch]
 
             results = await asyncio.gather(*tasks)
             all_results.extend(results)

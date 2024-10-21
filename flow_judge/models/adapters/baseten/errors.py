@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
+
 
 class FlowJudgeError(BaseModel):
     """Represents an error encountered during the Flow Judge evaluation process.
@@ -22,7 +24,9 @@ class FlowJudgeError(BaseModel):
 
     error_type: str = Field(..., description="Type of the error encountered")
     error_message: str = Field(..., description="Detailed error message")
-    request_id: str | None = Field(default=None, description="ID of the request that caused the error")
+    request_id: str | None = Field(
+        default=None, description="ID of the request that caused the error"
+    )
     timestamp: datetime = Field(
         default_factory=datetime.now, description="Time when the error occurred"
     )
@@ -38,6 +42,7 @@ class FlowJudgeError(BaseModel):
         if not v.strip():
             raise ValueError("Field must not be empty or just whitespace")
         return v
+
 
 class BasetenAPIError(Exception):
     """Base exception for Baseten API errors."""

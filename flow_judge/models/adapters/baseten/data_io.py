@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing_extensions import TypedDict
+
 from flow_judge.models.adapters.baseten.errors import FlowJudgeError
+
 
 class Message(TypedDict):
     """Represents a single request message for the Baseten API.
@@ -14,10 +16,12 @@ class Message(TypedDict):
         Do not include sensitive information in the 'content' field, as it may
         be logged or stored for debugging purposes.
     """
+
     id: str
     index: int
     prompt: str
     response: str
+
 
 class BatchResult(BaseModel):
     """Represents the result of a batch evaluation process.

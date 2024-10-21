@@ -1,8 +1,10 @@
-import aiohttp
 import json
+
+import aiohttp
 import structlog
 
 logger = structlog.get_logger(__name__)
+
 
 def _get_management_base_url(model_id: str) -> str:
     """Get the base URL for the Management API.
@@ -12,11 +14,8 @@ def _get_management_base_url(model_id: str) -> str:
     """
     return f"https://api.baseten.co/v1/models/{model_id}/deployments/production"
 
-async def set_scale_down_delay(
-        scale_down_delay: int,
-        api_key: str,
-        model_id: str
-    ) -> bool:
+
+async def set_scale_down_delay(scale_down_delay: int, api_key: str, model_id: str) -> bool:
     """Dynamically updates the cooldown period for the deployed model.
 
     :param scale_down_delay: The cooldown period in seconds.
@@ -30,40 +29,29 @@ async def set_scale_down_delay(
             async with session.patch(
                 url=url,
                 headers={"Authorization": f"Api-Key {api_key}"},
-                json={
-                    "scale_down_delay": scale_down_delay
-                }
+                json={"scale_down_delay": scale_down_delay},
             ) as response:
                 if response.status != 200:
                     logger.warning(
                         "Unable to update Baseten scale down delay attribute."
                         f"Request failed with status code {response.status}"
-                        )
+                    )
                     return False
-                
+
                 resp = await response.json()
                 if "status" in resp:
-                    return (
-                        True if resp["status"] 
-                            in ["ACCEPTED", "UNCHANGED", "QUEUED"] 
-                            else False
-                        )
+                    return True if resp["status"] in ["ACCEPTED", "UNCHANGED", "QUEUED"] else False
     except aiohttp.ClientError as e:
-        logger.warning(
-            "Network error with Baseten scale_down_delay"
-            f" {e}"
-        )
+        logger.warning("Network error with Baseten scale_down_delay" f" {e}")
         return False
     except Exception as e:
-        logger.error(
-            "Unexpected error occurred with Baseten scale down delay request"
-            f" {e}"
-        )
+        logger.error("Unexpected error occurred with Baseten scale down delay request" f" {e}")
         return False
-    
+
+
 async def wake_deployment(model_id: str, api_key: str) -> bool:
     """Activates the Baseten model.
-    
+
     :param model_id: The ID of the deployed model.
     :returns: True if success, False if failed.
     :rtype: bool
@@ -72,31 +60,24 @@ async def wake_deployment(model_id: str, api_key: str) -> bool:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                url=url,
-                headers={"Authorization": f"Api-Key {api_key}"},
-                json={}
+                url=url, headers={"Authorization": f"Api-Key {api_key}"}, json={}
             ) as response:
                 if response.status != 202:
                     logger.warning(
                         "Unable to activate Baseten model."
                         f"Request failed with status code {response.status}"
-                        )
+                    )
                     return False
-                                
+
                 return True
     except aiohttp.ClientError as e:
-        logger.warning(
-            "Network error with Baseten model activation."
-            f" {e}"
-        )
+        logger.warning("Network error with Baseten model activation." f" {e}")
         return False
     except Exception as e:
-        logger.error(
-            "Unexpected error occurred with Baseten model activation."
-            f" {e}"
-        )
+        logger.error("Unexpected error occurred with Baseten model activation." f" {e}")
         return False
-    
+
+
 async def get_production_deployment_status(model_id: str, api_key: str) -> str | None:
     """Get model production deployment_id by it's model_id.
 
@@ -114,26 +95,19 @@ async def get_production_deployment_status(model_id: str, api_key: str) -> str |
                     logger.warning(
                         "Unable to get model deployment details"
                         f"Request failed with status {response.status}"
-                        )
+                    )
                     return None
-                
+
                 re = await response.json()
                 return re["status"]
     except (json.JSONDecodeError, KeyError, IndexError) as e:
-        logger.warning(
-            "Unable to parse response for Model deployment info request."
-            f" {e}"
-        )
-        return None      
+        logger.warning("Unable to parse response for Model deployment info request." f" {e}")
+        return None
     except aiohttp.ClientError as e:
-        logger.warning(
-            "Network error with Baseten model deployment information."
-            f" {e}"
-        )
+        logger.warning("Network error with Baseten model deployment information." f" {e}")
         return None
     except Exception as e:
         logger.error(
-            "Unexpected error occurred with Baseten model deployment info request."
-            f" {e}"
+            "Unexpected error occurred with Baseten model deployment info request." f" {e}"
         )
         return None

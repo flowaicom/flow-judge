@@ -80,7 +80,7 @@ For the hosted proxy there's no additional setup needed. You only need to config
 async mode:
 
 ```python
-model=Baseten(exec_async=True, webhook_proxy_url="https://flow-judge-proxy.flow-ai.com")
+model=Baseten(exec_async=True, webhook_proxy_url="https://proxy.flow-ai.dev")
 ```
 
 Similarly to the synchronous execution, during the first run you will be asked for the API key to your Baseten account,

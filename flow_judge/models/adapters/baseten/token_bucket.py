@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass, field
 
+
 @dataclass
 class TokenBucket:
     """Implements a token bucket algorithm for rate limiting.

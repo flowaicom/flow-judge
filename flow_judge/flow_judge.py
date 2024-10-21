@@ -1,10 +1,10 @@
 import asyncio
 import logging
 
-from flow_judge.models.adapters.baseten.data_io import BatchResult
-from flow_judge.models.adapters.baseten.errors import FlowJudgeError
 from flow_judge.eval_data_types import EvalInput, EvalOutput
 from flow_judge.metrics import CustomMetric, Metric
+from flow_judge.models.adapters.baseten.data_io import BatchResult
+from flow_judge.models.adapters.baseten.errors import FlowJudgeError
 from flow_judge.models.common import AsyncBaseFlowJudgeModel, BaseFlowJudgeModel
 from flow_judge.utils.prompt_formatter import format_rubric, format_user_prompt, format_vars
 from flow_judge.utils.result_writer import write_results_to_disk
@@ -122,7 +122,9 @@ class AsyncFlowJudge(BaseFlowJudge):
         if not isinstance(model, AsyncBaseFlowJudgeModel):
             raise ValueError("Invalid model type. Use AsyncBaseFlowJudgeModel or its subclasses.")
 
-    async def async_evaluate(self, eval_input: EvalInput, save_results: bool = False) -> EvalOutput | None:
+    async def async_evaluate(
+        self, eval_input: EvalInput, save_results: bool = False
+    ) -> EvalOutput | None:
         """Evaluate a single EvalInput object asynchronously."""
         try:
             self._validate_inputs(eval_input)
@@ -132,9 +134,7 @@ class AsyncFlowJudge(BaseFlowJudge):
 
             # If there are Baseten errors we log & return here.
             if isinstance(result, FlowJudgeError):
-                logger.error(
-                    f" {result.error_type}: {result.error_message}"
-                )
+                logger.error(f" {result.error_type}: {result.error_message}")
                 return
 
             eval_output = EvalOutput.parse(response)

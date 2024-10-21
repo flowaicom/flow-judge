@@ -64,6 +64,9 @@ jobs:
         export TRANSFORMERS_CACHE=/tmp/hf_home
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
         export BASETEN_API_KEY=${{ secrets.BASETEN_API_KEY }}
+        export BASETEN_MODEL_ID=${{ secrets.BASETEN_MODEL_ID }}
+        export BASETEN_WEBHOOK_SECRET=${{ secrets.BASETEN_WEBHOOK_SECRET }}
+        export BASETEN_WEBHOOK_URL=${{ secrets.BASETEN_WEBHOOK_URL }}
         pytest ./tests/e2e-cloud-gpu --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

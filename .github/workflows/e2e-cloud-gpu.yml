@@ -1,10 +1,10 @@
 name: E2E Test (cloud engines, GPU enabled)
 
 on:
-  workflow_dispatch:
   pull_request:
     types: [ready_for_review]
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
 

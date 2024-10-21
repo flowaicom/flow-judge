@@ -1,4 +1,4 @@
-name: Test and Lint
+name: E2E Test (local engines, GPU enabled)
 
 on:
   push:
@@ -63,7 +63,7 @@ jobs:
         export HF_HOME=/tmp/hf_home
         export TRANSFORMERS_CACHE=/tmp/hf_home
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-        pytest ./tests/unit --cov=./  --junitxml=junit.xml
+        pytest ./tests/e2e-local --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

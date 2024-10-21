@@ -1,10 +1,7 @@
-name: Test and Lint
+name: E2E Test (cloud engines, GPU enabled)
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
 
@@ -63,7 +60,8 @@ jobs:
         export HF_HOME=/tmp/hf_home
         export TRANSFORMERS_CACHE=/tmp/hf_home
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-        pytest ./tests/unit --cov=./  --junitxml=junit.xml
+        export BASETEN_API_KEY=${{ secrets.BASETEN_API_KEY }}
+        pytest ./tests/e2e-cloud-gpu --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

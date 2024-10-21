@@ -1,6 +1,8 @@
 name: E2E Test (cloud engines, GPU enabled)
 
 on:
+  schedule:
+    - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday
   pull_request:
     types: [ready_for_review]
     branches: [ main ]

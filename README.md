@@ -164,6 +164,18 @@ The library supports multiple inference backends to accommodate different hardwa
    model = Llamafile()
    ```
 
+4. **Baseten**:
+    - Remote execution.
+    - Improved concurrency patterns for larger workloads.
+    - Machine independent.
+
+  ```python
+  from flow_judge import Baseten
+
+  model = Baseten()
+  ```
+  For detailed information on using Baseten, visit the [Baseten readme](https://github.com/flowaicom/flow-judge/blob/feat/baseten-integration/flow_judge/models/adapters/baseten/README.md).
+
 Choose the inference backend that best matches your hardware and performance requirements. The library provides a unified interface for all these options, making it easy to switch between them as needed.
 
 

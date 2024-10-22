@@ -47,7 +47,9 @@ The Flow Judge model can be deployed with A10G or H100 40GB on Baseten's infrast
 You have an option to set the `BASETEN_GPU` environment variable using either `A10G` or `H100` as the value in a notebook environment.
 If in an interactive environment (CLI) you will be asked if you would like to switch to H100.
 The FlowJudge models are then selected based on the architecture and GPU selection:
+
 A10G -> Flow-Judge-v0.1-AWQ
+
 H100 -> Flow-Judge-v0.1-FP8
 
 ## Sync execution

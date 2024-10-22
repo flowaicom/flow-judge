@@ -41,6 +41,15 @@ For async (batch) execution, it is required to create webhook secret in your Bas
 Follow the official Baseten instructions:
 https://docs.baseten.co/invoke/async-secure#creating-webhook-secrets
 
+### Baseten GPU
+
+The Flow Judge model can be deployed with A10G or H100 40GB on Baseten's infrastructure.
+You have an option to set the `BASETEN_GPU` environment variable using either `A10G` or `H100` as the value in a notebook environment.
+If in an interactive environment (CLI) you will be asked if you would like to switch to H100.
+The FlowJudge models are then selected based on the architecture and GPU selection:
+A10G -> Flow-Judge-v0.1-AWQ
+H100 -> Flow-Judge-v0.1-FP8
+
 ## Sync execution
 
 When running Flow Judge eval, use `Baseten` class as a model
@@ -52,7 +61,7 @@ model=Baseten()
 
 That's it! :)
 
-During the first run you will be asked to provide the Baseten API key.
+During the first run you will be asked to provide the Baseten API key and the GPU.
 The key will be stored on your computer in `~/.trussrc` (see [truss](https://docs.baseten.co/truss-reference/overview)).
 It is used to validate if the model is already deployed and deploy it if needed.
 
@@ -71,7 +80,7 @@ We offer a free proxy as an effortless solution that can forward responses direc
 without exposing endpoint from your computer to the internet.
 This is the default behavior when running in batch mode.
 
-Alternatively, you can use tools like `ngrok` or `localtunnel` to expose the same proxy running locally on your device
+Alternatively, you can use tools like `ngrok` or `localtunnel` to expose the [same proxy](https://github.com/flowaicom/webhook-proxy) running locally on your device
 next to the Flow Judge.
 
 ### Flow AI proxy (hosted)
@@ -83,7 +92,7 @@ async mode:
 model=Baseten(exec_async=True, webhook_proxy_url="https://proxy.flow-ai.dev")
 ```
 
-Similarly to the synchronous execution, during the first run you will be asked for the API key to your Baseten account,
+Similarly to the synchronous execution, during the first run you will be asked for the API key to your Baseten account and the GPU,
 unless provided earlier. The key is used to validate and deploy the model to your Baseten account.
 
 Additionally, when using asynchronous execution, we verify the signature of the received webhooks payloads, as
@@ -96,7 +105,7 @@ in `~/.config/flow-judge/baseten_webhook_secret` and never leaves your device.
 Currently Flow Judge does not provide a standalone endpoint to expose to the Internet. Instead, you can run an instance
 of our proxy on your machine and expose it's endpoint using eg. `ngrok`.
 
-1. Download pre-built binary from the proxy releases page: https://github.com/flowaicom/baseten-webhook-proxy/releases
+1. Download pre-built binary from the proxy releases page: https://github.com/flowaicom/webhook-proxy/releases
    or build it according to the instructions provided in the repository.
 2. Run the proxy:
     ```shell

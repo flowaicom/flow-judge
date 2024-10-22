@@ -1,6 +1,7 @@
 import json
 
 import aiohttp
+import requests
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -13,6 +14,29 @@ def _get_management_base_url(model_id: str) -> str:
     :returns: The URL for the management endpoints
     """
     return f"https://api.baseten.co/v1/models/{model_id}/deployments/production"
+
+
+def sync_set_scale_down(scale_down_delay: int, api_key: str, model_id: str) -> bool:
+    """Syncronous update to the cooldown period for the deployed model.
+
+    :param scale_down_delay: The cooldown period in seconds.
+    :param api_key: The Baseten API key.
+    :param model_id: The ID of the deployed model on Baseten.
+    :returns bool: True if successful, False otherwise.
+    """
+    try:
+        resp = requests.patch(
+            f"{_get_management_base_url(model_id)}/autoscaling_settings",
+            headers={"Authorization": f"Api-Key {api_key}"},
+            json={"scale_down_delay": scale_down_delay},
+        )
+
+        re = resp.json()
+        if "status" in re:
+            return True if re["status"] in ["ACCEPTED", "UNCHANGED", "QUEUED"] else False
+    except Exception as e:
+        logger.error("Unexpected error occurred with Baseten scale down delay request" f" {e}")
+        return False
 
 
 async def set_scale_down_delay(scale_down_delay: int, api_key: str, model_id: str) -> bool:
@@ -45,7 +69,7 @@ async def set_scale_down_delay(scale_down_delay: int, api_key: str, model_id: st
         logger.warning("Network error with Baseten scale_down_delay" f" {e}")
         return False
     except Exception as e:
-        logger.error("Unexpected error occurred with Baseten scale down delay request" f" {e}")
+        logger.warning("Unexpected error occurred with Baseten scale down delay request" f" {e}")
         return False
 
 

@@ -7,7 +7,7 @@ import truss
 from truss.api.definitions import ModelDeployment
 from truss.remote.baseten.error import ApiError
 
-from flow_judge.models.adapters.baseten.management import set_scale_down_delay
+from flow_judge.models.adapters.baseten.management import sync_set_scale_down
 
 from .api_auth import ensure_baseten_authentication, get_baseten_api_key
 from .gpu import ensure_gpu
@@ -51,14 +51,23 @@ def _initialize_model() -> bool:
         logger.debug("Waiting for deployment to become active")
         deployment.wait_for_active()
         logger.info("Flow Judge Baseten deployment successful")
-        has_updated_scale_down = set_scale_down_delay(120)
-        if has_updated_scale_down:
-            logger.info("Successfully updated Baseten deployed model scale down delay to 2 mins.")
-        else:
-            logger.info(
-                "Unable to update Baseten deployed model scale down delay period."
-                " Continuing with default"
+
+        model_id = get_deployed_model_id()
+        api_key = get_baseten_api_key()
+        if model_id and api_key:
+            has_updated_scale_down = sync_set_scale_down(
+                scale_down_delay=120, api_key=api_key, model_id=model_id
             )
+            if has_updated_scale_down:
+                logger.info(
+                    "Successfully updated Baseten deployed model scale down delay to 2 mins."
+                )
+            else:
+                logger.info(
+                    "Unable to update Baseten deployed model scale down delay period."
+                    " Continuing with default"
+                )
+
         return True
     except ApiError as e:
         logger.error(

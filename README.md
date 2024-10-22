@@ -166,8 +166,8 @@ The library supports multiple inference backends to accommodate different hardwa
 
 4. **Baseten**:
     - Remote execution.
-    - Improved concurrency patterns for larger workloads.
     - Machine independent.
+    - Improved concurrency patterns for larger workloads.
 
   ```python
   from flow_judge import Baseten

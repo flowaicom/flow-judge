@@ -1,0 +1,99 @@
+base_image:
+  image: baseten/truss-server-base:3.11-gpu-v0.9.0
+environment_variables:
+  CUDA_HOME: /usr/local/cuda
+  LD_LIBRARY_PATH: /usr/local/cuda/extras/CUPTI/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+  PATH: /usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  VLLM_ATTENTION_BACKEND: FLASH_ATTN
+external_package_dirs: []
+model_metadata:
+  example_model_input:
+    messages:
+    - content: "# GOAL\nYour job is to evaluate a task carried out by an AI system\
+        \ powered by a large language model.\n\nYou will be provided with the inputs\
+        \ and output of the task, as well as the evaluation criteria and scoring rubric.\
+        \ Your task is to evaluate the output of the AI system based on the evaluation\
+        \ criteria and scoring rubric provided.\n\n# INPUT\nBelow are the inputs required\
+        \ for performing the task:\n<inputs>\n<query>\nPlease read the technical issue\
+        \ that the user is facing and help me create a detailed solution based on\
+        \ the context provided.\n</query>\n<context>\n# Customer Issue: I'm having\
+        \ trouble pushing large files to my Git repository. It says 'File size exceeds\
+        \ GitHub's file size limit of 100 MB'.\n\n# Context: Git Large File Storage\
+        \ (LFS) replaces large files such as audio samples, videos, datasets, and\
+        \ graphics with text pointers inside Git, while storing the file contents\
+        \ on a remote server like GitHub.com or GitHub Enterprise.\n\nTo use Git LFS,\
+        \ you need to download and install the Git command line extension. For more\
+        \ information, see 'Installing Git Large File Storage'.\n\nOnce Git LFS is\
+        \ installed, you need to set up Git LFS for your user account by running:\n\
+        \n$ git lfs install\n</context>\n</inputs>\n\n# OUTPUT\nBelow is the output\
+        \ of the task:\n<output>\n<response>\nTo resolve your issue with pushing large\
+        \ files to your Git repository, you should use Git Large File Storage (LFS).\
+        \ Here's a step-by-step solution:\n\n1. Install Git LFS by following the instructions\
+        \ in the 'Installing Git Large File Storage' guide.\n\n2. Set up Git LFS for\
+        \ your user account by running:\n ```\n git lfs install\n ```\n\n3. In your\
+        \ repository, track the large files you want to push using:\n ```\n git lfs\
+        \ track \"*.large-file-extension\"\n ```\n Replace 'large-file-extension'\
+        \ with the actual extension of your large files.\n\n4. Add the .gitattributes\
+        \ file to your repository:\n ```\n git add .gitattributes\n ```\n\n5. Now,\
+        \ add and commit your large files as usual:\n ```\n git add large-file.ext\n\
+        \ git commit -m \"Add large file\"\n ```\n\n6. Push your changes:\n ```\n\
+        \ git push origin main\n ```\n\nBy using Git LFS, you'll be able to push files\
+        \ larger than GitHub's 100 MB limit, as LFS will handle them appropriately.\n\
+        </response>\n</output>\n\n# EVALUATION CRITERIA AND SCORING RUBRIC\nHere are\
+        \ the evaluation criteria and the rubric that you need to use for evaluating\
+        \ the task:\n<evaluation_criteria>\nBased on the given context, evaluate how\
+        \ consistent and faithful the generated response is to the context. The response\
+        \ should not contain any hallucinated or fabricated information that is not\
+        \ supported by the context.\n</evaluation_criteria>\n\n<scoring_rubric>\n\
+        - Score 1: The response is completely inconsistent with the provided context.\
+        \ It contains significant amount of hallucinated or fabricated information\
+        \ that directly contradicts or is not supported at all by the context.\n-\
+        \ Score 2: The response is mostly inconsistent with the provided context.\
+        \ While it may contain some information from the context, it introduces a\
+        \ substantial amount of hallucinated or fabricated details that deviate from\
+        \ the context.\n- Score 3: The response is somewhat consistent with the provided\
+        \ context. It includes a mix of information from the context and some hallucinated\
+        \ or fabricated details. The fabrications are minor and do not significantly\
+        \ contradict the context.\n- Score 4: The response is mostly consistent with\
+        \ the provided context. The vast majority of the content is supported by the\
+        \ context, with only minor and inconsequential inconsistencies or fabrications,\
+        \ if any.\n- Score 5: The response is completely consistent with and faithful\
+        \ to the provided context. All details in the response are directly supported\
+        \ by the context, without any hallucinated or fabricated information.\n</scoring_rubric>\n\
+        \n# INSTRUCTIONS FOR THE EVALUATION\n1. Understand the task and criteria:\
+        \ Familiarize yourself with the task to be evaluated. Review the evaluation\
+        \ criteria and scoring rubric to understand the different levels of performance\
+        \ and the descriptions for each score.\n2. Review the inputs and output: Look\
+        \ at the inputs provided for the task. Examine the output generated from completing\
+        \ the task.\n3. Compare output to score descriptions: Compare the output against\
+        \ the criteria and score descriptions in the scoring rubric. For each criterion,decide\
+        \ which description best matches the output.\n4. After comparing the output\
+        \ to the score descriptions, pay attention to the small details that might\
+        \ impact the final score that you assign. Sometimes a small difference can\
+        \ dictate the final score.\n5. Write verbal feedback justifying your evaluation\
+        \ that includes a detailed rationale, referring to specific aspects of the\
+        \ output and comparing them to the rubric.\n6. Assign a final score based\
+        \ on the scoring rubric.\n\n## FORMAT FOR THE EVALUATION\n- Write the verbal\
+        \ feedback inside <feedback> tags without any additional surrounding text.\n\
+        - Write the numeric score inside <score> tags, without any additional surrounding\
+        \ text and always after the feedback.\n\nPlease accurately evaluate the task.\
+        \ Strictly adhere to the evaluation criteria and rubric."
+      role: user
+  openai_compatible: true
+  repo_id: flowaicom/Flow-Judge-v0.1-AWQ
+  vllm_config:
+    max_model_len: 8192
+    tensor_parallel_size: 1
+model_name: Flow-Judge-v0.1
+python_version: py311
+repo_id: flowaicom/Flow-Judge-v0.1-AWQ
+requirements:
+- vllm>=0.6.2
+- vllm-flash-attn
+resources:
+  accelerator: A10G
+  use_gpu: true
+runtime:
+  predict_concurrency: 128
+secrets:
+  hf_access_token: hf_xyz

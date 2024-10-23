@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .adapters.base import BaseAPIAdapter
+
 
 class BaseFlowJudgeModel(ABC):
     """Base class for all FlowJudge models."""
@@ -59,6 +61,42 @@ class AsyncBaseFlowJudgeModel(ABC):
         pass
 
 
+class FlowJudgeRemoteModel(BaseFlowJudgeModel):
+    """Flow judge model class for remote hosting."""
+
+    def __init__(
+        self,
+        model_id: str,
+        model_type: str,
+        generation_params: dict[str, Any],
+        api_adapter: BaseAPIAdapter,
+        **remote_kwargs: Any,
+    ):
+        """Initialize the FlowJudge remote model class.
+
+        :param model_id: The ID of the model.
+        :param model_type: Type of the model based on ModelType.
+        :param generation_params: Relevant generation params for the model type.
+        :param remote_kwargs: Keyword arguments to initialize the parameters.
+        """
+        super().__init__(model_id, model_type, generation_params, **remote_kwargs)
+
+        if not isinstance(api_adapter, BaseAPIAdapter):
+            raise ValueError("Invalid Adapter type. Use BaseAPIAdapter.")
+
+        self.api_adapter = api_adapter
+
+    def generate(self, prompt: str) -> str:
+        """Single generation request."""
+        conversation = [{"role": "user", "content": prompt.strip()}]
+        return self.api_adapter.fetch_response(conversation)
+
+    def batch_generate(self, prompts: list[str], use_tqdm: bool = True, **kwargs: Any) -> list[str]:
+        """Batched generation request."""
+        conversations = [[{"role": "user", "content": prompt.strip()}] for prompt in prompts]
+        return self.api_adapter.fetch_batched_response(conversations)
+
+
 class GenerationParams(BaseModel):
     """Configuration parameters for text generation."""
 
@@ -90,10 +128,12 @@ class VllmGenerationParams(GenerationParams):
 class ModelType(Enum):
     """Enum for the type of model."""
 
-    TRANSFORMERS: str = "transformers"
-    VLLM: str = "vllm"
-    VLLM_ASYNC: str = "vllm_async"
-    LLAMAFILE: str = "llamafile"
+    TRANSFORMERS = "transformers"
+    VLLM = "vllm"
+    VLLM_ASYNC = "vllm_async"
+    LLAMAFILE = "llamafile"
+    BASETEN_VLLM = "baseten_vllm"
+    BASETEN_VLLM_ASYNC = "baseten_vllm_async"
 
 
 class Engine(Enum):

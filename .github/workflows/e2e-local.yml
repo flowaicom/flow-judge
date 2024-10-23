@@ -1,4 +1,4 @@
-name: Test and Lint
+name: E2E Test (local engines, GPU enabled)
 
 on:
   push:
@@ -12,8 +12,6 @@ jobs:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch all history for trufflehog
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -38,13 +36,6 @@ jobs:
           echo "pyupgrade would make changes. Please run pyupgrade locally and commit the changes."
           exit 1
         fi
-    - name: Run TruffleHog
-      uses: trufflesecurity/trufflehog@v3.82.6
-      with:
-        path: ./
-        base: ${{ github.event.pull_request.base.sha }}
-        head: ${{ github.event.pull_request.head.sha }}
-        extra_args: --only-verified --exclude-globs=".venv/*"
 
   test:
     needs: lint
@@ -72,7 +63,7 @@ jobs:
         export HF_HOME=/tmp/hf_home
         export TRANSFORMERS_CACHE=/tmp/hf_home
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-        pytest ./tests/unit --cov=./  --junitxml=junit.xml
+        pytest ./tests/e2e-local --cov=./  --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

@@ -11,7 +11,8 @@ authors = [
     {name = "Bernardo Garcia", email = "bernardo@flow-ai.com"},
     {name = "Karolus Sariola", email = "karolus@flow-ai.com"},
     {name = "Minaam Shahid", email = "minaam@flow-ai.com"},
-    {name = "Tiina Vaahtio", email = "tiina@flow-ai.com"}
+    {name = "Tiina Vaahtio", email = "tiina@flow-ai.com"},
+    {name = "Alex Wegrzyn", email = "alex.wegrzyn@flow-ai.com"},
 ]
 license = {file = "LICENSE"}
 classifiers = [
@@ -28,6 +29,7 @@ dependencies = [
     "ipykernel>=6.29.0",
     "ipywidgets>=8.1.0",
     "tqdm>=4.66.1",
+    "structlog",
 ]
 
 [project.optional-dependencies]
@@ -44,7 +46,8 @@ dev = [
     "types-tqdm",
     "memray>=1.14.0",
     "pytest-memray>=1.7.0",
-    "pytest-asyncio>=0.24.0",
+    "pytest-asyncio>=0.23.6, <0.24.0",
+    "hypothesis"
 ]
 integrations-test = [
     "llama-index",
@@ -61,12 +64,20 @@ llamafile = [
     "torch>=2.3.0",
     "openai>=1.51.0",
 ]
+baseten = [
+    "truss>=0.9.44",
+    "openai>=1.51.0",
+    "aiohttp>=3.10.5"
+]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"
 
 [tool.setuptools]
 packages = ["flow_judge", "flow_judge.integrations", "flow_judge.metrics", "flow_judge.models", "flow_judge.utils"]
+
+[tool.setuptools.package-data]
+"flow_judge.models" = ["adapters/baseten/**/*.yaml"]
 
 [tool.setuptools_scm]
 version_scheme = "python-simplified-semver"

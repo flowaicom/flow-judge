@@ -131,8 +131,8 @@ In addition to the pre-built binaries, we also provide proxy Docker images.
 Run the proxy with Docker:
 
 ```shell
-docker pull ghcr.io/flowaicom/baseten-webhook-proxy:latest
-docker run --name=flowai-proxy -d -p 8000:8000 ghcr.io/flowaicom/baseten-webhook-proxy:latest
+docker pull ghcr.io/flowaicom/webhook-proxy:latest
+docker run --name=flowai-proxy -d -p 8000:8000 ghcr.io/flowaicom/webhook-proxy:latest
 ```
 
 Then continue with the process from point 3. from the list above.

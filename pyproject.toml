@@ -64,7 +64,11 @@ llamafile = [
     "torch>=2.3.0",
     "openai>=1.51.0",
 ]
-baseten = ["truss>=0.9.44", "openai>=1.51.0"]
+baseten = [
+    "truss>=0.9.44",
+    "openai>=1.51.0",
+    "aiohttp>=3.10.5"
+]
 
 [project.urls]
 Homepage = "https://github.com/flowaicom/flow-judge"

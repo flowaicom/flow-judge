@@ -120,7 +120,6 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
     _instances = set()
     _next_port = 8085
     _DEFAULT_MODEL_ID = "flowaicom/Flow-Judge-v0.1-Llamafile"
-    _MODEL_TYPE = "llamafile"
 
     @classmethod
     def _get_next_port(cls):
@@ -224,10 +223,10 @@ class Llamafile(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
 
         # Call both parent class initializers
         BaseFlowJudgeModel.__init__(
-            self, model_id, self._MODEL_TYPE, config.generation_params, **kwargs
+            self, model_id, config.model_type, config.generation_params, **kwargs
         )
         AsyncBaseFlowJudgeModel.__init__(
-            self, model_id, self._MODEL_TYPE, config.generation_params, **kwargs
+            self, model_id, config.model_type, config.generation_params, **kwargs
         )
 
         try:

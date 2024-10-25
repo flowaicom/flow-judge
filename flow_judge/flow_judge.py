@@ -166,7 +166,7 @@ class AsyncFlowJudge(BaseFlowJudge):
                     f"Number of Baseten API errors: {len(batch_result.errors)}"
                     f" of {batch_result.total_requests}."
                     f" Success rate is {batch_result.success_rate}"
-                    "List of errors: "
+                    " List of errors: "
                 )
                 for error in batch_result.errors:
                     logger.warning(f"{error.error_type}: {error.error_message}")

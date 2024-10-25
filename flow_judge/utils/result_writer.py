@@ -3,6 +3,9 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
+from enum import Enum
+
+from pydantic import BaseModel
 
 import flow_judge
 from flow_judge.eval_data_types import EvalInput, EvalOutput
@@ -26,6 +29,13 @@ def write_results_to_disk(
     fmt_metric_name = re.sub(r"\s", "_", re.sub(r"\(|\)", "", metric_name.lower()))
     fmt_model_id = model_metadata["model_id"].replace("/", "__")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%f")[:-3]
+
+    for key, item in model_metadata.items():
+        if isinstance(item, BaseModel):
+            model_metadata[key] = item.model_dump()
+        if isinstance(item, Enum):
+            model_metadata[key] = item.value
+
     metadata = {
         "library_version": f"{flow_judge.__version__}",
         "timestamp": timestamp,

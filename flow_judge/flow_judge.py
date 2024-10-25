@@ -48,11 +48,18 @@ class BaseFlowJudge:
         else:
             validate_eval_input(eval_inputs, self.metric)
 
-    def _save_results(self, eval_inputs: list[EvalInput], eval_outputs: list[EvalOutput]):
+    def _save_results(
+        self, eval_inputs: list[EvalInput], eval_outputs: list[EvalOutput], append: bool = False
+    ):
         """Save results to disk."""
-        logger.info(f"Saving results to {self.output_dir}")
+        logger.info(f"{'Appending' if append else 'Saving'} results to {self.output_dir}")
         write_results_to_disk(
-            eval_inputs, eval_outputs, self.model.metadata, self.metric.name, self.output_dir
+            eval_inputs,
+            eval_outputs,
+            self.model.metadata,
+            self.metric.name,
+            self.output_dir,
+            append=append,
         )
 
 
@@ -123,7 +130,7 @@ class AsyncFlowJudge(BaseFlowJudge):
             raise ValueError("Invalid model type. Use AsyncBaseFlowJudgeModel or its subclasses.")
 
     async def async_evaluate(
-        self, eval_input: EvalInput, save_results: bool = False
+        self, eval_input: EvalInput, save_results: bool = False, append: bool = False
     ) -> EvalOutput | None:
         """Evaluate a single EvalInput object asynchronously."""
         try:
@@ -132,14 +139,16 @@ class AsyncFlowJudge(BaseFlowJudge):
             result = await self.model._async_generate(prompt)
             response = result
 
-            # If there are Baseten errors we log & return here.
             if isinstance(result, FlowJudgeError):
                 logger.error(f" {result.error_type}: {result.error_message}")
                 return
 
             eval_output = EvalOutput.parse(response)
             if save_results:
-                await asyncio.to_thread(self._save_results, [eval_input], [eval_output])
+                logger.info(f"Saving result {'(append)' if append else '(overwrite)'}")
+                await asyncio.to_thread(
+                    self._save_results, [eval_input], [eval_output], append=append
+                )
             return eval_output
         except Exception as e:
             logger.error(f"Asynchronous evaluation failed: {e}")
@@ -151,6 +160,7 @@ class AsyncFlowJudge(BaseFlowJudge):
         eval_inputs: list[EvalInput],
         use_tqdm: bool = True,
         save_results: bool = True,
+        append: bool = False,  # Change default to False
         fail_on_parse_error: bool = False,
     ) -> list[EvalOutput]:
         """Batch evaluate a list of EvalInput objects asynchronously."""
@@ -178,7 +188,16 @@ class AsyncFlowJudge(BaseFlowJudge):
 
         parse_failures = sum(1 for output in eval_outputs if output.score == -1)
         if save_results:
-            await asyncio.to_thread(self._save_results, eval_inputs, eval_outputs)
+            logger.info(f"Saving {len(eval_outputs)} results")
+            for i, (eval_input, eval_output) in enumerate(
+                zip(eval_inputs, eval_outputs, strict=True)
+            ):
+                await asyncio.to_thread(
+                    self._save_results,
+                    [eval_input],
+                    [eval_output],
+                    append=(append or i > 0),  # Append for all but the first, unless append is True
+                )
 
         if parse_failures > 0:
             logger.warning(f"Number of parsing failures: {parse_failures} out of {len(responses)}")

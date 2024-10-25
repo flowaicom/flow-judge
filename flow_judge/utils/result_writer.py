@@ -20,6 +20,7 @@ def write_results_to_disk(
     model_metadata: dict[str, Any],
     metric_name: str,
     output_dir: str | Path,
+    append: bool = False,
 ) -> None:
     """Write evaluation results, inputs, and metadata to separate JSONL files.
 
@@ -33,6 +34,7 @@ def write_results_to_disk(
         model_metadata: Dictionary containing model metadata.
         metric_name: Name of the metric being evaluated.
         output_dir: Directory to write output files.
+        append: If True, append results to existing file. If False, overwrite. Default is False.
 
     Raises:
         ValueError: If inputs are invalid, empty, or lists have different lengths.
@@ -50,20 +52,27 @@ def write_results_to_disk(
     fmt_metric_name = _format_name(metric_name)
     fmt_model_id = _format_name(model_metadata["model_id"])
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%f")[:-3]
-
     base_filename = f"{fmt_metric_name}_{fmt_model_id}_{model_metadata['model_type']}_{timestamp}"
     paths = _prepare_file_paths(output_dir, fmt_metric_name, fmt_model_id, base_filename)
-
     metadata = _prepare_metadata(model_metadata, timestamp)
 
     try:
         _write_json_file(paths["metadata"], metadata)
-        _write_results_file(paths["results"], eval_inputs, eval_outputs)
+
+        mode = "a" if append else "w"
+        with paths["results"].open(mode, encoding="utf-8") as f:
+            for eval_input, eval_output in zip(eval_inputs, eval_outputs, strict=True):
+                result = {
+                    "sample": eval_input.model_dump(),
+                    "feedback": eval_output.feedback,
+                    "score": eval_output.score,
+                }
+                f.write(json.dumps(result, ensure_ascii=False) + "\n")
+
+        logger.info(f"Results {'appended to' if append else 'saved to'} {paths['results']}")
     except OSError as e:
         logger.error(f"Error writing files: {e}")
         raise
-
-    logger.info(f"Results saved to {paths['results']}")
 
 
 def _validate_inputs(
@@ -206,7 +215,7 @@ def _write_json_file(path: Path, data: dict[str, Any]) -> None:
 
 
 def _write_results_file(
-    path: Path, eval_inputs: list[EvalInput], eval_outputs: list[EvalOutput]
+    path: Path, eval_inputs: list[EvalInput], eval_outputs: list[EvalOutput], append: bool = False
 ) -> None:
     """Write results to a JSONL file.
 
@@ -214,6 +223,7 @@ def _write_results_file(
         path: Path to the output file.
         eval_inputs: List of evaluation inputs.
         eval_outputs: List of evaluation outputs.
+        append: If True, append to the file. If False, overwrite. Default is False.
 
     Raises:
         OSError: If there's an error writing to the file.
@@ -221,14 +231,15 @@ def _write_results_file(
 
     Note:
         - Uses UTF-8 encoding.
-        - Overwrites the file if it already exists.
+        - Appends to the file if append is True, otherwise overwrites.
         - Each line in the file is a JSON object representing one result.
         - Ensures non-ASCII characters are preserved in the output.
     """
     if len(eval_inputs) != len(eval_outputs):
         raise ValueError("eval_inputs and eval_outputs must have the same length")
 
-    with path.open("w", encoding="utf-8") as f:
+    mode = "a" if append else "w"
+    with path.open(mode, encoding="utf-8") as f:
         for input_data, eval_output in zip(eval_inputs, eval_outputs, strict=True):
             result = {
                 "sample": input_data.model_dump(),

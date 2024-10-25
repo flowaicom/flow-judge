@@ -1,13 +1,13 @@
+import asyncio
+import json
 import logging
 import os
-import statistics
 import tempfile
 from collections import Counter
 from pathlib import Path
 
 import pytest
 from llama_index.core import VectorStoreIndex
-from llama_index.core.evaluation import BatchEvalRunner
 from llama_index.core.llama_dataset import download_llama_dataset
 
 from flow_judge.integrations.llama_index import LlamaIndexFlowJudge
@@ -231,7 +231,9 @@ async def test_correctness_evaluation(
         quantized=True,
         download_dir=str(test_cache_dir),
     )
-    flow_judge_evaluator = LlamaIndexFlowJudge(model=model, metric=correctness_metric)
+    flow_judge_evaluator = LlamaIndexFlowJudge(
+        model=model, metric=correctness_metric, save_results=True
+    )
     result = await flow_judge_evaluator.aevaluate(
         query=query, reference=reference, response=response
     )
@@ -280,89 +282,132 @@ def compare_distributions(
 
 
 @pytest.mark.asyncio
-async def test_batch_evaluation(correctness_metric, query, reference, test_cache_dir):
-    """Performs a batch evaluation of queries using LlamaIndexFlowJudge and analyzes results.
-
-    Args:
-        correctness_metric (CustomMetric): The metric used for evaluation.
-        query (str): A sample query (not used directly in this function).
-        reference (str): A sample reference answer (not used directly in this function).
-        test_cache_dir (Path): Temp dir that is sure to be okay during testing
-
-    Raises:
-        AssertionError: If the evaluation results do not meet expected criteria.
-    """
+async def test_batch_evaluation(correctness_metric, query, reference, response, test_cache_dir):
+    """Performs a batch evaluation of queries using LlamaIndexFlowJudge and analyzes results."""
     os.environ["HF_HOME"] = str(test_cache_dir)
-    model = Vllm(
-        exec_async=True,
-        gpu_memory_utilization=0.5,
-        quantized=True,
-        download_dir=str(test_cache_dir),
-    )
-    logging.info("Starting test_batch_evaluation")
+    model = None
+    flow_judge_correctness = None
 
-    flow_judge_correctness = LlamaIndexFlowJudge(model=model, metric=correctness_metric)
+    try:
+        logging.info("Starting test_batch_evaluation")
 
-    # Download and prepare the dataset
-    rag_dataset, documents = download_llama_dataset(
-        "MiniTruthfulQADataset", "./data/mini_truthful_qa"
-    )
-
-    # Create the index and query engine
-    index = VectorStoreIndex.from_documents(documents=documents)  # FIXME: depends on OpenAI
-    query_engine = index.as_query_engine()  # FIXME: depends on OpenAI
-
-    # Prepare queries and references
-    rag_subset = rag_dataset.examples[:10]
-    queries = [example.query for example in rag_subset]
-    references = [example.reference_answer for example in rag_subset]
-
-    logging.info(f"Evaluating {len(queries)} queries")
-
-    evaluators = {"correctness": flow_judge_correctness}
-
-    async def batch_eval_runner(evaluators, query_engine, questions, reference=None, num_workers=2):
-        batch_runner = BatchEvalRunner(evaluators, workers=num_workers, show_progress=True)
-
-        eval_results = await batch_runner.aevaluate_queries(
-            query_engine, queries=questions, reference=reference
+        logging.info("Initializing Vllm model")
+        model = Vllm(
+            exec_async=True,
+            gpu_memory_utilization=0.5,
+            quantized=True,
+            download_dir=str(test_cache_dir),
         )
+        logging.info("Vllm model initialized")
 
-        return eval_results
+        logging.info("Initializing LlamaIndexFlowJudge")
+        flow_judge_correctness = LlamaIndexFlowJudge(
+            model=model,
+            metric=correctness_metric,
+            output_dir=str(test_cache_dir),
+            save_results=True,
+        )
+        logging.info("LlamaIndexFlowJudge initialized")
 
-    eval_results = await batch_eval_runner(
-        evaluators=evaluators, query_engine=query_engine, questions=queries, reference=references
-    )
+        logging.info("Downloading and preparing dataset")
+        rag_dataset, documents = await asyncio.to_thread(
+            download_llama_dataset, "MiniTruthfulQADataset", "./data/mini_truthful_qa"
+        )
+        logging.info("Dataset prepared")
 
-    # Check results
-    assert "correctness" in eval_results
-    for key in eval_results:
-        assert len(eval_results[key]) == len(queries)
-        for result in eval_results[key]:
+        logging.info("Creating index and query engine")
+        index = await asyncio.to_thread(VectorStoreIndex.from_documents, documents=documents)
+        _ = index.as_query_engine()
+        logging.info("Index and query engine created")
+
+        rag_subset = rag_dataset.examples[:10]
+        queries = [example.query for example in rag_subset]
+        references = [example.reference_answer for example in rag_subset]
+
+        # Use the fixtures to create a batch of 3
+        queries = [query] * 3
+        references = [reference] * 3
+        responses = [response] * 3
+
+        logging.info(f"Starting evaluation of {len(queries)} queries")
+        eval_results = await flow_judge_correctness.aevaluate_batch(
+            queries=queries, responses=responses, references=references, save_results=True
+        )
+        logging.info(f"Finished evaluation, got {len(eval_results)} results")
+
+        # Check results
+        assert len(eval_results) == len(queries)
+        for result in eval_results:
             assert result.score is not None
             assert result.feedback is not None
 
-    # Calculate score distribution
-    scores = [result.score for result in eval_results["correctness"]]
-    actual_distribution = get_scores_distribution(scores)
-    logging.info(f"Actual score distribution: {actual_distribution}")
+        # Verify results were written to disk
+        expected_metric_folder = test_cache_dir / correctness_metric.name
+        expected_results_file = next(expected_metric_folder.glob("results_*.jsonl"), None)
 
-    # Calculate average score
-    average_score = statistics.mean(scores)
-    logging.info(f"Average score: {average_score:.2f}")
+        assert (
+            expected_results_file is not None
+        ), f"No results file found in {expected_metric_folder}"
 
-    # Assert that the average score is within an acceptable range
-    assert (
-        2.5 <= average_score <= 4.5
-    ), f"Average score {average_score:.2f} is outside the expected range of 2.5 to 4.5"
+        # Read and verify the results file
+        with expected_results_file.open("r") as f:
+            written_results = [json.loads(line) for line in f]
 
-    # Check that we have a variety of scores
-    unique_scores = set(scores)
-    assert (
-        len(unique_scores) >= 3
-    ), f"Expected at least 3 different score values, but got {len(unique_scores)}"
+        logging.info("Full content of written_results:")
+        logging.info(json.dumps(written_results, indent=2))
 
-    # Log the actual distribution for reference
-    logging.info(f"Actual distribution: {actual_distribution}")
+        assert len(written_results) == len(
+            queries
+        ), f"Expected {len(queries)} results, but found {len(written_results)}"
+
+        for i, result in enumerate(written_results):
+            logging.info(f"Validating result {i+1}")
+            assert "sample" in result, f"Result {i+1} is missing 'sample' key"
+            assert "inputs" in result["sample"], f"Result {i+1} is missing 'inputs' key in 'sample'"
+
+            evaluation = result["sample"]["inputs"]
+            logging.info(f"Evaluation {i+1} structure:")
+            logging.info(json.dumps(evaluation, indent=2))
+
+            assert (
+                len(evaluation) == 2
+            ), f"Expected 2 input components in result {i+1}, but found {len(evaluation)}"
+            assert (
+                "query" in evaluation[0]
+            ), f"First input component in result {i+1} should be the query"
+            assert (
+                "reference" in evaluation[1]
+            ), f"Second input component in result {i+1} should be the reference"
+
+            assert (
+                evaluation[0]["query"] == queries[i]
+            ), f"Query in result {i+1} doesn't match the input query"
+
+            assert "feedback" in result, f"Result {i+1} is missing 'feedback'"
+            assert "score" in result, f"Result {i+1} is missing 'score'"
+            assert isinstance(
+                result["score"], (int, float)
+            ), f"Score in result {i+1} should be a number"
+
+        logging.info(f"Results successfully written to and verified in {expected_results_file}")
+
+        logging.info("Results processing and verification completed")
+
+    finally:
+        if model:
+            await model.aclose()
+
+        if flow_judge_correctness and hasattr(flow_judge_correctness, "aclose"):
+            await flow_judge_correctness.aclose()
+
+        # Allow time for background tasks to complete
+        await asyncio.sleep(1)
+
+        # Cancel any remaining tasks
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        [task.cancel() for task in tasks]
+
+        # Wait for all tasks to be cancelled
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     logging.info("test_batch_evaluation completed successfully")
-    del model

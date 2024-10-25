@@ -59,7 +59,7 @@ hf = [
     "bitsandbytes>=0.41.0,<=0.42.0",
     "accelerate>=0.34.2",
 ]
-vllm = ["vllm>=0.6.2"]
+vllm = ["vllm==0.6.2"]
 llamafile = [
     "torch>=2.3.0",
     "openai>=1.51.0",

@@ -293,6 +293,11 @@ class Vllm(BaseFlowJudgeModel, AsyncBaseFlowJudgeModel):
         if self.exec_async:
             self.engine.shutdown_background_loop()
 
+    async def aclose(self):
+        """Asynchronous cleanup method."""
+        self.shutdown()
+        await asyncio.sleep(0.1)  # Give a moment for background tasks to clean up
+
 
 class VllmError(Exception):
     """Custom exception for Vllm-related errors."""

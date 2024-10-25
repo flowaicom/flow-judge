@@ -75,7 +75,6 @@ Homepage = "https://github.com/flowaicom/flow-judge"
 
 [tool.setuptools]
 packages = ["flow_judge", "flow_judge.integrations", "flow_judge.metrics", "flow_judge.models", "flow_judge.utils"]
-exclude = ["img"]
 
 [tool.setuptools.package-data]
 "flow_judge.models" = ["adapters/baseten/**/*.yaml"]

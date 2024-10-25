@@ -112,10 +112,17 @@ def _format_name(name: str) -> str:
         A formatted string safe for use in file paths.
 
     Note:
-        This function replaces all characters that are not alphanumeric,
-        underscore, or hyphen with an underscore.
+        This function replaces spaces with underscores, removes non-alphanumeric
+        characters (except underscore and hyphen), and replaces non-ASCII
+        characters with underscores.
     """
-    return re.sub(r"[^\w\-_]", "_", name)
+    # Replace spaces with underscores
+    name = name.replace(" ", "_")
+    # Remove any character that is not alphanumeric, underscore, or hyphen
+    name = re.sub(r"[^\w\-]", "", name)
+    # Replace any non-ASCII character with underscore
+    name = re.sub(r"[^\x00-\x7F]", "_", name)
+    return name
 
 
 def _prepare_file_paths(

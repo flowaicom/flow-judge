@@ -334,6 +334,7 @@ class AsyncBasetenAPIAdapter(AsyncBaseAPIAdapter):
                         signature = split_chunks[2].replace("\n\n", "").split("signature=")[1]
 
                     except (json.JSONDecodeError, KeyError, IndexError) as e:
+                        logger.warning(f"Failed to parse chunk: {e}")
                         raise BasetenResponseError(f"Invalid JSON response: {str(e)}") from e
 
                     if "data: eot" in decoded_chunk:

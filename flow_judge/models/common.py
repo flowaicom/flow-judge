@@ -7,16 +7,27 @@ from pydantic import BaseModel, Field
 from .adapters.base import BaseAPIAdapter
 
 
+class ModelType(Enum):
+    """Enum for the type of model."""
+
+    TRANSFORMERS = "transformers"
+    VLLM = "vllm"
+    VLLM_ASYNC = "vllm_async"
+    LLAMAFILE = "llamafile"
+    BASETEN_VLLM = "baseten_vllm"
+    BASETEN_VLLM_ASYNC = "baseten_vllm_async"
+
+
 class BaseFlowJudgeModel(ABC):
     """Base class for all FlowJudge models."""
 
     def __init__(
-        self, model_id: str, model_type: str, generation_params: dict[str, Any], **kwargs: Any
+        self, model_id: str, model_type: ModelType, generation_params: dict[str, Any], **kwargs: Any
     ) -> None:
         """Initialize the base FlowJudge model."""
         self.metadata: dict[str, Any] = {
             "model_id": model_id,
-            "model_type": model_type,
+            "model_type": model_type.value,
             "generation_params": generation_params,
             "kwargs": kwargs,
         }
@@ -38,12 +49,12 @@ class AsyncBaseFlowJudgeModel(ABC):
     """Base class for asynchronous FlowJudge models."""
 
     def __init__(
-        self, model_id: str, model_type: str, generation_params: dict[str, Any], **kwargs: Any
+        self, model_id: str, model_type: ModelType, generation_params: dict[str, Any], **kwargs: Any
     ) -> None:
         """Initialize the base asynchronous FlowJudge model."""
         self.metadata: dict[str, Any] = {
             "model_id": model_id,
-            "model_type": model_type,
+            "model_type": model_type.value,
             "generation_params": generation_params,
             "kwargs": kwargs,
         }
@@ -123,17 +134,6 @@ class VllmGenerationParams(GenerationParams):
         self.max_tokens = self.max_new_tokens
         del self.max_new_tokens
         del self.do_sample
-
-
-class ModelType(Enum):
-    """Enum for the type of model."""
-
-    TRANSFORMERS = "transformers"
-    VLLM = "vllm"
-    VLLM_ASYNC = "vllm_async"
-    LLAMAFILE = "llamafile"
-    BASETEN_VLLM = "baseten_vllm"
-    BASETEN_VLLM_ASYNC = "baseten_vllm_async"
 
 
 class Engine(Enum):

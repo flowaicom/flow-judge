@@ -70,6 +70,7 @@ Extras available:
 - `hf` to install Hugging Face Transformers dependencies
 - `vllm` to install vLLM dependencies
 - `llamafile` to install Llamafile dependencies
+- `baseten` to install Baseten dependencies
 
 ## Quick Start
 

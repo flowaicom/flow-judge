@@ -361,6 +361,14 @@ async def test_baseten_init_valid(
 
         # Test asynchronous initialization without webhook secret
         monkeypatch.delenv("BASETEN_WEBHOOK_SECRET", raising=False)
+    with (
+        patch("flow_judge.models.baseten.get_deployed_model_id", return_value="mock_model_id"),
+        patch("flow_judge.models.baseten.ensure_model_deployment", return_value=True),
+        patch(
+            "flow_judge.models.baseten.ensure_baseten_webhook_secret",
+            return_value=False,
+        ),
+    ):
         with pytest.raises(
             BasetenError,
             match=(

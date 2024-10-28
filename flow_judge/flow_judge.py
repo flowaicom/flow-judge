@@ -132,7 +132,7 @@ class AsyncFlowJudge(BaseFlowJudge):
     def _handle_batch_result(
         self, batch_result: BatchResult, batch_len: int, fail_on_parse_error: bool
     ) -> list[EvalOutput]:
-        """Handle output parsing for batched results from Baseten.
+        """Handle output parsing for batched results.
 
         Args:
             batch_result: The result of the batch from Baseten.

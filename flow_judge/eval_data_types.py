@@ -17,7 +17,7 @@ class EvalOutput(BaseModel):
     """Output model for evaluation results."""
 
     feedback: str = Field(..., description="Feedback from the evaluation")
-    score: int = Field(..., description="Numeric score from the evaluation")
+    score: int | None = Field(..., description="Numeric score from the evaluation")
 
     @classmethod
     def parse(cls, response: str, fail_on_parse_error: bool = False) -> "EvalOutput":
